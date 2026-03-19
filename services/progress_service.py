@@ -210,25 +210,45 @@ def get_total_time_spent(user_id):
     return total_minutes
 
 
-def get_unique_session_count(user_id):
+def get_unique_session_count(user_id, domain_id=None):
     """
     Get the number of unique quiz sessions for a user.
 
     Args:
         user_id: ID of the user
+        domain_id: Optional domain ID to filter sessions (default: all domains)
 
     Returns:
         int: Number of unique sessions
     """
-    # Count distinct session_ids
-    result = (
-        db.session.query(Attempt.session_id)
-        .filter(Attempt.user_id == user_id, Attempt.session_id.isnot(None))
-        .distinct()
-        .count()
+    query = db.session.query(Attempt.session_id).filter(
+        Attempt.user_id == user_id, Attempt.session_id.isnot(None)
     )
 
+    # Filter by domain if specified
+    if domain_id is not None:
+        query = query.join(Fact).filter(Fact.domain_id == domain_id)
+
+    result = query.distinct().count()
+
     return result
+
+
+def is_domain_complete(user_id, domain_id):
+    """
+    Check if a user has completed (mastered all facts in) a domain.
+
+    Args:
+        user_id: ID of the user
+        domain_id: ID of the domain
+
+    Returns:
+        bool: True if all facts are mastered
+    """
+    from services.fact_service import get_unmastered_facts
+
+    unmastered = get_unmastered_facts(domain_id, user_id)
+    return len(unmastered) == 0
 
 
 def format_time_spent(minutes):

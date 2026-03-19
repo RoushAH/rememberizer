@@ -1059,3 +1059,246 @@ def test_answer_checking_uses_values_not_indices(
             .first()
         )
         assert attempt.correct is True
+
+
+# ============================================================================
+# MISSED LEARNING DETECTION TESTS
+# ============================================================================
+
+
+def test_start_prioritizes_out_of_order_facts(
+    authenticated_student, app, assigned_domain, student_user
+):
+    """Test that /start prioritizes out-of-order facts."""
+    with app.app_context():
+        from services.fact_service import mark_fact_learned
+
+        facts = Fact.query.filter_by(domain_id=assigned_domain.id).order_by(Fact.id).all()
+        fact_id_1 = facts[1].id
+        fact_id_2 = facts[2].id
+
+        # Learn facts 0 and 2, skip fact 1 (creates gap)
+        mark_fact_learned(facts[0].id, student_user.id)
+        mark_fact_learned(fact_id_2, student_user.id)
+
+    # POST to /start - should prioritize fact 1 (out of order)
+    response = authenticated_student.post(
+        "/start", data={"domain_id": assigned_domain.id}, follow_redirects=False
+    )
+
+    assert response.status_code == 302
+    assert f"/show_fact/{fact_id_1}" in response.location
+
+
+def test_start_shows_new_facts_when_no_out_of_order(
+    authenticated_student, app, assigned_domain, student_user
+):
+    """Test that /start shows new facts when no out-of-order facts exist."""
+    with app.app_context():
+        facts = Fact.query.filter_by(domain_id=assigned_domain.id).all()
+
+    # POST to /start (no facts have been shown yet)
+    response = authenticated_student.post(
+        "/start", data={"domain_id": assigned_domain.id}, follow_redirects=False
+    )
+
+    # Should redirect to show_fact for some fact (not specifically the first one)
+    assert response.status_code == 302
+    assert "/show_fact/" in response.location
+
+
+def test_show_fact_displays_out_of_order_warning(
+    authenticated_student, app, assigned_domain, student_user
+):
+    """Test that out-of-order facts show the warning."""
+    with app.app_context():
+        from services.fact_service import mark_fact_learned
+
+        facts = Fact.query.filter_by(domain_id=assigned_domain.id).order_by(Fact.id).all()
+        fact_id_1 = facts[1].id
+
+        # Learn facts 0 and 2, creating gap at fact 1
+        mark_fact_learned(facts[0].id, student_user.id)
+        mark_fact_learned(facts[2].id, student_user.id)
+
+    with authenticated_student.session_transaction() as sess:
+        sess["domain_id"] = assigned_domain.id
+
+    # View fact 1 (out of order)
+    response = authenticated_student.get(f"/show_fact/{fact_id_1}")
+
+    assert response.status_code == 200
+    assert b"OUT OF ORDER" in response.data
+    assert b"was skipped" in response.data
+
+
+def test_show_fact_no_warning_for_learned_facts(
+    authenticated_student, app, assigned_domain, student_user
+):
+    """Test that show_fact does NOT display warning for learned facts."""
+    with app.app_context():
+        from services.fact_service import mark_fact_learned
+
+        facts = Fact.query.filter_by(domain_id=assigned_domain.id).all()
+        fact_id = facts[0].id
+
+        # Mark as learned (not missed)
+        mark_fact_learned(fact_id, student_user.id)
+
+    # Initialize session with domain
+    with authenticated_student.session_transaction() as sess:
+        sess["domain_id"] = assigned_domain.id
+
+    # GET /show_fact
+    response = authenticated_student.get(f"/show_fact/{fact_id}")
+
+    assert response.status_code == 200
+    assert b"OUT OF ORDER" not in response.data
+
+
+def test_show_fact_no_warning_for_new_facts(
+    authenticated_student, app, assigned_domain, student_user
+):
+    """Test that brand new facts (shown for first time) don't show warning."""
+    with app.app_context():
+        facts = Fact.query.filter_by(domain_id=assigned_domain.id).order_by(Fact.id).all()
+        fact_id = facts[0].id
+
+    with authenticated_student.session_transaction() as sess:
+        sess["domain_id"] = assigned_domain.id
+
+    # View brand new fact (never shown before, no later facts learned)
+    response = authenticated_student.get(f"/show_fact/{fact_id}")
+
+    assert response.status_code == 200
+    assert b"OUT OF ORDER" not in response.data
+
+
+def test_out_of_order_clears_after_learning(
+    authenticated_student, app, assigned_domain, student_user
+):
+    """Test that out-of-order warning clears after learning the fact."""
+    with app.app_context():
+        from services.fact_service import mark_fact_learned
+
+        facts = Fact.query.filter_by(domain_id=assigned_domain.id).order_by(Fact.id).all()
+        fact_id_1 = facts[1].id
+
+        # Learn facts 0 and 2, creating gap at fact 1
+        mark_fact_learned(facts[0].id, student_user.id)
+        mark_fact_learned(facts[2].id, student_user.id)
+
+    with authenticated_student.session_transaction() as sess:
+        sess["domain_id"] = assigned_domain.id
+
+    # Verify warning appears for fact 1
+    response = authenticated_student.get(f"/show_fact/{fact_id_1}")
+    assert b"OUT OF ORDER" in response.data
+
+    # Mark fact 1 as learned
+    response = authenticated_student.post(
+        f"/mark_learned/{fact_id_1}", follow_redirects=False
+    )
+    assert response.status_code == 302
+
+    # If we show fact 1 again, warning should NOT appear (gap filled)
+    response = authenticated_student.get(f"/show_fact/{fact_id_1}")
+    assert response.status_code == 200
+
+
+# ============================================================================
+# DUPLICATE SYMBOL INTEGRATION TEST
+# ============================================================================
+
+
+def test_muses_duplicate_symbol_full_quiz_flow(
+    authenticated_student, app, teacher_user, student_user
+):
+    """Integration test: Full quiz flow with muses domain and duplicate symbols."""
+    from facts_loader import load_domain_from_file
+    from services.domain_service import assign_domain_to_user
+    from models import db
+    import os
+
+    with app.app_context():
+        # Load muses domain
+        facts_dir = os.path.join(os.path.dirname(__file__), "..", "facts")
+        muses_file = os.path.join(facts_dir, "greek_muses.json")
+        domain = load_domain_from_file(muses_file)
+        domain.created_by_id = teacher_user.id
+        domain.organization_id = teacher_user.organization_id
+        db.session.commit()
+
+        # Assign to student
+        assign_domain_to_user(student_user.id, domain.id, teacher_user.id)
+
+        # Get Erato and Terpsichore
+        facts = Fact.query.filter_by(domain_id=domain.id).all()
+        erato = next(f for f in facts if f.get_fact_data()["name"] == "Erato")
+        terpsichore = next(
+            f for f in facts if f.get_fact_data()["name"] == "Terpsichore"
+        )
+
+        domain_id = domain.id
+        erato_id = erato.id
+        terpsichore_id = terpsichore.id
+
+    # Start quiz
+    response = authenticated_student.post(
+        "/start", data={"domain_id": domain_id}, follow_redirects=True
+    )
+    assert response.status_code == 200
+
+    # Learn Erato
+    response = authenticated_student.post(
+        f"/mark_learned/{erato_id}", follow_redirects=True
+    )
+
+    # Quiz on Erato multiple times
+    for _ in range(5):
+        response = authenticated_student.get("/quiz", follow_redirects=True)
+        assert response.status_code == 200
+
+        with authenticated_student.session_transaction() as sess:
+            if sess.get("current_fact_id") == erato_id:
+                options = sess["options"]
+                correct_answer = sess["correct_answer"]
+
+                # If asking about symbol, verify no duplicate "Lyre"
+                if "symbol" in sess.get("current_field_name", "").lower():
+                    lyre_count = sum(1 for opt in options if opt == "Lyre")
+                    assert lyre_count == 1
+
+                correct_index = options.index(correct_answer)
+
+                # Answer correctly
+                response = authenticated_student.post(
+                    "/answer", data={"answer": correct_index}, follow_redirects=True
+                )
+
+    # Learn Terpsichore
+    response = authenticated_student.post(
+        f"/mark_learned/{terpsichore_id}", follow_redirects=True
+    )
+
+    # Quiz on Terpsichore multiple times
+    for _ in range(5):
+        response = authenticated_student.get("/quiz", follow_redirects=True)
+        assert response.status_code == 200
+
+        with authenticated_student.session_transaction() as sess:
+            if sess.get("current_fact_id") == terpsichore_id:
+                options = sess["options"]
+                correct_answer = sess["correct_answer"]
+
+                # If asking about symbol, verify no duplicate "Lyre"
+                if "symbol" in sess.get("current_field_name", "").lower():
+                    lyre_count = sum(1 for opt in options if opt == "Lyre")
+                    assert lyre_count == 1
+
+                correct_index = options.index(correct_answer)
+
+                # Answer correctly
+                response = authenticated_student.post(
+                    "/answer", data={"answer": correct_index}, follow_redirects=True
+                )

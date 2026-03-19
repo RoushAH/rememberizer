@@ -7,11 +7,21 @@ from facts_loader import load_all_domains_from_directory
 from auth import login_manager
 
 app = Flask(__name__)
+
+# Get absolute path to database in instance folder
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, 'instance', 'database.db')
+
+# Ensure instance folder exists
+os.makedirs(os.path.join(BASE_DIR, 'instance'), exist_ok=True)
+
 app.config["SECRET_KEY"] = os.environ.get(
     "SECRET_KEY", "dev-secret-key-change-in-production"
 )
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///database.db"
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+print(f"Database configured at: {DB_PATH}")
 
 # Initialize database
 db.init_app(app)
@@ -77,18 +87,19 @@ def init_database():
     global _db_initialized
 
     # Check if database already exists and has tables
-    if os.path.exists("database.db"):
+    if os.path.exists(DB_PATH):
         # Database file exists - check if it has tables
         try:
             with app.app_context():
                 # Try to query domains table
                 existing_domains = Domain.query.count()
-                print(f"Database exists with {existing_domains} domains")
+                print(f"✓ Existing database found at: {DB_PATH}")
+                print(f"  Database has {existing_domains} domains")
                 _db_initialized = True
                 return  # Database is already set up
         except Exception:
             # Table doesn't exist, continue with initialization
-            print("Database file exists but tables missing, initializing...")
+            print(f"Database file exists at {DB_PATH} but tables missing, initializing...")
 
     if _db_initialized:
         return
@@ -201,14 +212,16 @@ from blueprints.admin import admin_bp  # noqa: E402
 from blueprints.teacher import teacher_bp  # noqa: E402
 from blueprints.student import student_bp  # noqa: E402
 from blueprints.quiz import quiz_bp  # noqa: E402
+from blueprints.analytics import analytics_bp  # noqa: E402
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(teacher_bp)
 app.register_blueprint(student_bp)
 app.register_blueprint(quiz_bp)
+app.register_blueprint(analytics_bp)
 
 
 if __name__ == "__main__":
     init_database()
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=True, use_reloader=False, host="0.0.0.0", port=5002)

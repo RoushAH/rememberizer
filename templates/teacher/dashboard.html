@@ -9,6 +9,9 @@
     <div class="navigation" style="margin-bottom: 20px;">
         <a href="{{ url_for('teacher.dashboard') }}" class="btn-view" style="background-color: #2a5a2a;">[MY STUDENTS]</a>
         <a href="{{ url_for('teacher.domains') }}" class="btn-view">[MY DOMAINS]</a>
+        <a href="{{ url_for('teacher.groups') }}" class="btn-view">[GROUPS]</a>
+        <a href="{{ url_for('teacher.templates') }}" class="btn-view">[TEMPLATES]</a>
+        <a href="{{ url_for('analytics.dashboard') }}" class="btn-view">[ANALYTICS]</a>
     </div>
 
     <h2>&gt; MY STUDENTS ({{ student_data|length }})</h2>
@@ -46,6 +49,9 @@
                         {% for dp in data.domain_progress %}
                         <div style="margin: 10px 0;">
                             <strong>{{ dp.domain.name }}:</strong> {{ dp.progress }}
+                            {% if dp.is_complete %}
+                            <span style="color: #00FF00;"> [COMPLETED]</span>
+                            {% endif %}
                         </div>
                         {% endfor %}
                     </div>

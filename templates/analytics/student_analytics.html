@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics: {{ student.first_name }} {{ student.last_name }}{% endblock %}
+
+{% block header_title %}{{ ("STUDENT ANALYTICS") | center_in_box }}{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    .chart-container {
+        background-color: #001a00;
+        border: 2px solid #00FF00;
+        padding: 20px;
+        margin: 20px 0;
+        position: relative;
+        height: 200px;
+    }
+    .chart-title {
+        color: #00FF00;
+        font-size: 16px;
+        font-weight: bold;
+        margin-bottom: 15px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content">
+    <h2>&gt; {{ student.first_name.upper() }} {{ student.last_name.upper() }}</h2>
+
+    <div class="info-box">
+        <p><strong>Email:</strong> {{ student.email }}</p>
+        {% if student.last_active %}
+        <p><strong>Last Active:</strong> {{ student.last_active.strftime('%Y-%m-%d %H:%M') }}</p>
+        {% else %}
+        <p><strong>Last Active:</strong> Never</p>
+        {% endif %}
+    </div>
+
+    <h2>&gt; PERFORMANCE METRICS</h2>
+
+    <div class="stats" style="margin: 30px 0;">
+        <div class="stat-item">
+            <div class="stat-value">{{ total_questions }}</div>
+            <div class="stat-label">Total Questions</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ total_correct }}</div>
+            <div class="stat-label">Correct</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ accuracy }}%</div>
+            <div class="stat-label">Accuracy</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ questions_today }}</div>
+            <div class="stat-label">Today</div>
+        </div>
+    </div>
+
+    {% if streak_info %}
+    <div class="stats" style="margin: 30px 0;">
+        <div class="stat-item">
+            <div class="stat-value" style="color: #FFAA00;">{{ streak_info.current_streak }}</div>
+            <div class="stat-label">Current Streak</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ streak_info.longest_streak }}</div>
+            <div class="stat-label">Longest Streak</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ formatted_time }}</div>
+            <div class="stat-label">Total Time</div>
+        </div>
+    </div>
+    {% endif %}
+
+    <h2>&gt; ACTIVITY (LAST 7 DAYS)</h2>
+
+    <div class="chart-container">
+        <canvas id="activityChart"></canvas>
+    </div>
+
+    <h2>&gt; DOMAIN PROGRESS</h2>
+
+    {% if domain_progress|length > 0 %}
+    <div class="domain-assignment-list">
+        {% for dp in domain_progress %}
+        <div class="domain-assignment-item">
+            <div>
+                <strong>{{ dp.domain.name }}</strong>
+                {% if dp.progress %}
+                    <br>
+                    Progress: {{ dp.progress.progress_string }}
+                    {% if dp.progress.is_complete %}
+                    <span style="color: #00FF00;"> [COMPLETED]</span>
+                    {% endif %}
+                    <br>
+                    Learned: {{ dp.progress.learned_count }}/{{ dp.progress.total_facts }} |
+                    Mastered: {{ dp.progress.mastered_count }}/{{ dp.progress.total_facts }}
+                    {% if dp.progress.attempt_count > 0 %}
+                    <br>
+                    Attempts: {{ dp.progress.attempt_count }}
+                    {% endif %}
+                {% else %}
+                    <br>
+                    <span style="color: #666666;">No progress yet</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="info-box">
+        <p>No domains assigned to this student.</p>
+    </div>
+    {% endif %}
+
+    <div class="button-container">
+        <a href="{{ url_for('teacher.student_detail', student_id=student.id) }}" class="action-button">[MANAGE STUDENT]</a>
+        <a href="{{ url_for('analytics.dashboard') }}" class="action-button">[BACK TO ANALYTICS]</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const chartColors = {
+    green: '#00FF00',
+    darkGreen: '#00AA00',
+    grid: '#003300'
+};
+
+const activityData = {{ activity_by_day | tojson }};
+
+const ctx = document.getElementById('activityChart').getContext('2d');
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: activityData.map(d => d.date),
+        datasets: [{
+            label: 'Questions',
+            data: activityData.map(d => d.count),
+            backgroundColor: chartColors.green,
+            borderColor: chartColors.green,
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false }
+        },
+        scales: {
+            x: {
+                ticks: { color: chartColors.darkGreen },
+                grid: { color: chartColors.grid }
+            },
+            y: {
+                ticks: { color: chartColors.darkGreen },
+                grid: { color: chartColors.grid },
+                beginAtZero: true
+            }
+        }
+    }
+});
+</script>
+{% endblock %}
+
+{% block footer_text %}Student Analytics{% endblock %}

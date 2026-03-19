@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Domain Completed!</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .celebration-container {
+            max-width: 900px;
+            margin: 50px auto;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .celebration-title {
+            color: #00FF00;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 30px;
+            letter-spacing: 2px;
+        }
+
+        .ascii-banner {
+            font-family: 'Courier New', Courier, monospace;
+            white-space: pre;
+            font-size: 10px;
+            line-height: 1.1;
+            color: #00FF00;
+            margin: 30px 0;
+            overflow-x: auto;
+        }
+
+        .completion-message {
+            border: 2px solid #00FF00;
+            padding: 20px;
+            margin: 30px 0;
+            color: #00FF00;
+        }
+
+        .stats-box {
+            border: 2px solid #00FF00;
+            padding: 20px;
+            margin: 30px auto;
+            text-align: left;
+            max-width: 500px;
+        }
+
+        .stats-box h3 {
+            color: #00FF00;
+            margin-bottom: 15px;
+            text-align: center;
+            font-size: 18px;
+        }
+
+        .stat-row {
+            margin: 10px 0;
+            font-family: 'Courier New', Courier, monospace;
+            color: #00FF00;
+            padding: 5px 0;
+        }
+
+        .button-container {
+            margin-top: 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .button-container a {
+            background-color: #000000;
+            color: #00FF00;
+            border: 2px solid #00FF00;
+            padding: 15px 20px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 16px;
+            text-decoration: none;
+            display: block;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .button-container a:hover {
+            background-color: #00FF00;
+            color: #000000;
+        }
+
+        .what-next-title {
+            color: #00FF00;
+            font-size: 20px;
+            margin: 40px 0 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="celebration-container">
+        <h1 class="celebration-title">╔═══════════════════════════════════════╗</h1>
+        <h1 class="celebration-title">║     DOMAIN COMPLETED!                ║</h1>
+        <h1 class="celebration-title">╚═══════════════════════════════════════╝</h1>
+
+        <div class="ascii-banner">
+ ██████╗ ██████╗ ███╗   ██╗ ██████╗ ██████╗  █████╗ ████████╗███████╗██╗
+██╔════╝██╔═══██╗████╗  ██║██╔════╝ ██╔══██╗██╔══██╗╚══██╔══╝██╔════╝██║
+██║     ██║   ██║██╔██╗ ██║██║  ███╗██████╔╝███████║   ██║   ███████╗██║
+██║     ██║   ██║██║╚██╗██║██║   ██║██╔══██╗██╔══██║   ██║   ╚════██║╚═╝
+╚██████╗╚██████╔╝██║ ╚████║╚██████╔╝██║  ██║██║  ██║   ██║   ███████║██╗
+ ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝
+        </div>
+
+        <div class="completion-message">
+            <p>You have mastered every fact in "{{ domain.name }}"!</p>
+        </div>
+
+        <div class="stats-box">
+            <h3>╔═══ COMPLETION STATISTICS ═══╗</h3>
+            <div class="stat-row">&gt; Domain: {{ domain.name }}</div>
+            <div class="stat-row">&gt; Facts Mastered: {{ total_facts }} / {{ total_facts }}</div>
+            <div class="stat-row">&gt; Total Attempts: {{ attempt_count }}</div>
+            <div class="stat-row">&gt; Time Spent: {{ time_spent }}</div>
+            <div class="stat-row">&gt; Quiz Sessions: {{ session_count }}</div>
+        </div>
+
+        <h2 class="what-next-title">&gt; What would you like to do next?</h2>
+
+        <div class="button-container">
+            <a href="{{ url_for('quiz.continue_mastered_domain', domain_id=domain.id) }}">
+                [KEEP QUIZZING THIS DOMAIN]
+            </a>
+            <a href="{{ url_for('student.domains') }}">
+                [TRY A DIFFERENT DOMAIN]
+            </a>
+        </div>
+    </div>
+</body>
+</html>

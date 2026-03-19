@@ -657,3 +657,226 @@ h2 {
 .welcome-box strong {
     color: #00FF00;
 }
+
+/* ===========================================
+   STREAK SYSTEM STYLES
+   =========================================== */
+
+.streak-banner {
+    text-align: center;
+    padding: 15px;
+    margin-bottom: 20px;
+    border: 2px solid #00FF00;
+    background-color: #001a00;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.streak-label {
+    color: #00FF00;
+    font-weight: bold;
+}
+
+.streak-count {
+    font-size: 2em;
+    font-weight: bold;
+    color: #FFAA00;
+    margin: 0 5px;
+}
+
+.streak-unit {
+    color: #00FF00;
+    font-weight: bold;
+}
+
+.streak-warning {
+    color: #FFAA00;
+    font-weight: bold;
+    display: inline-block;
+    margin-top: 5px;
+}
+
+.daily-goal-progress {
+    text-align: center;
+    margin: 15px 0 25px 0;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.progress-ascii {
+    color: #00FF00;
+    letter-spacing: 3px;
+    font-size: 1.1em;
+}
+
+/* ===========================================
+   ANALYTICS & CHARTS STYLES
+   =========================================== */
+
+.chart-container {
+    background-color: #001a00;
+    border: 2px solid #00FF00;
+    padding: 20px;
+    margin: 20px 0;
+    position: relative;
+    height: 300px;
+}
+
+.chart-title {
+    color: #00FF00;
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 15px;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+@media (max-width: 800px) {
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* At-Risk Alert Box */
+.at-risk-alert {
+    background-color: #331a00;
+    border: 2px solid #FFAA00;
+    color: #FFAA00;
+    padding: 15px;
+    margin: 20px 0;
+}
+
+.at-risk-alert h3 {
+    margin: 0 0 15px 0;
+    font-size: 16px;
+}
+
+.at-risk-item {
+    margin: 10px 0;
+    padding: 10px;
+    border-bottom: 1px solid #664400;
+}
+
+.at-risk-item:last-child {
+    border-bottom: none;
+}
+
+.risk-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    margin: 2px;
+    font-size: 12px;
+    border: 1px solid;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.risk-inactive {
+    border-color: #FFAA00;
+    color: #FFAA00;
+}
+
+.risk-struggling {
+    border-color: #FF6666;
+    color: #FF6666;
+}
+
+.risk-declining {
+    border-color: #FF6666;
+    color: #FF6666;
+}
+
+/* Progress Bar */
+.progress-bar-container {
+    width: 100px;
+    background-color: #001a00;
+    border: 1px solid #00FF00;
+    height: 20px;
+}
+
+.progress-bar-fill {
+    background-color: #00FF00;
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+/* ===========================================
+   GROUP MANAGEMENT STYLES
+   =========================================== */
+
+.group-members {
+    margin: 20px 0;
+}
+
+.group-member-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid #00FF00;
+    margin: 5px 0;
+    background-color: #001a00;
+}
+
+.bulk-action-form {
+    margin: 20px 0;
+    padding: 15px;
+    border: 1px solid #00FF00;
+    background-color: #001a00;
+}
+
+.bulk-action-form h3 {
+    margin: 0 0 15px 0;
+    color: #00FF00;
+}
+
+/* Template Tags */
+.template-domain-tag {
+    display: inline-block;
+    margin: 2px 5px;
+    padding: 2px 8px;
+    border: 1px solid #00AA00;
+    font-size: 12px;
+    color: #00AA00;
+}
+
+/* Checkbox List */
+.checkbox-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #00FF00;
+    padding: 10px;
+    margin-top: 10px;
+}
+
+.checkbox-list label {
+    display: block;
+    margin: 10px 0;
+    cursor: pointer;
+}
+
+.checkbox-list input[type="checkbox"] {
+    margin-right: 10px;
+}
+
+/* File Input Styling */
+input[type="file"].form-input {
+    padding: 10px;
+}
+
+input[type="file"].form-input::file-selector-button {
+    background-color: #000000;
+    color: #00FF00;
+    border: 2px solid #00FF00;
+    padding: 8px 15px;
+    font-family: 'Courier New', Courier, monospace;
+    cursor: pointer;
+    margin-right: 10px;
+}
+
+input[type="file"].form-input::file-selector-button:hover {
+    background-color: #00FF00;
+    color: #000000;
+}

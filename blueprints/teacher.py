@@ -34,6 +34,7 @@ def dashboard():
     from services.progress_service import (
         get_progress_string,
         get_questions_answered_today,
+        is_domain_complete,
     )
     from models import Domain, Attempt
 
@@ -55,7 +56,10 @@ def dashboard():
         domain_progress = []
         for domain in assigned_domains:
             progress_str = get_progress_string(domain.id, student.id)
-            domain_progress.append({"domain": domain, "progress": progress_str})
+            is_complete = is_domain_complete(student.id, domain.id)
+            domain_progress.append(
+                {"domain": domain, "progress": progress_str, "is_complete": is_complete}
+            )
 
         # Get engagement metrics
         questions_today = get_questions_answered_today(student.id)
@@ -87,7 +91,10 @@ def dashboard():
 def domains():
     """List all available domains with testing option."""
     from services.domain_service import get_visible_domains
-    from services.progress_service import get_student_domain_progress
+    from services.progress_service import (
+        get_student_domain_progress,
+        is_domain_complete,
+    )
 
     require_teacher_or_admin()
 
@@ -98,6 +105,8 @@ def domains():
     domain_data = []
     for domain in visible_domains:
         progress = get_student_domain_progress(current_user.id, domain.id)
+        if progress:
+            progress["is_complete"] = is_domain_complete(current_user.id, domain.id)
         domain_data.append(
             {
                 "domain": domain,
@@ -315,7 +324,9 @@ def student_detail(student_id):
         get_total_time_spent,
         get_unique_session_count,
         format_time_spent,
+        is_domain_complete,
     )
+    from services.streak_service import get_streak_info
     from models import User, Domain, Attempt
 
     require_teacher_or_admin()
@@ -340,6 +351,8 @@ def student_detail(student_id):
 
         if is_assigned:
             progress_data = get_student_domain_progress(student.id, domain.id)
+            if progress_data:
+                progress_data["is_complete"] = is_domain_complete(student.id, domain.id)
             domain_details.append(
                 {"domain": domain, "is_assigned": True, "progress": progress_data}
             )
@@ -355,6 +368,9 @@ def student_detail(student_id):
     formatted_time = format_time_spent(total_time_minutes)
     total_questions = Attempt.query.filter_by(user_id=student.id).count()
 
+    # Get streak info for this student
+    streak_info = get_streak_info(student.id)
+
     return render_template(
         "teacher/student_detail.html",
         student=student,
@@ -363,6 +379,7 @@ def student_detail(student_id):
         formatted_time=formatted_time,
         session_count=session_count,
         total_questions=total_questions,
+        streak_info=streak_info,
     )
 
 
@@ -492,4 +509,435 @@ def deactivate_student(student_id):
 
 # ============================================================================
 # END TEACHER STUDENT MANAGEMENT ROUTES
+# ============================================================================
+
+
+# ============================================================================
+# GROUP MANAGEMENT ROUTES
+# ============================================================================
+
+
+@teacher_bp.route("/groups")
+@login_required
+def groups():
+    """List all groups."""
+    from services.group_service import (
+        get_groups_by_organization,
+        get_students_in_group,
+    )
+
+    require_teacher_or_admin()
+
+    all_groups = get_groups_by_organization(current_user.organization_id)
+
+    # Add student count to each group
+    group_data = []
+    for group in all_groups:
+        students = get_students_in_group(group.id)
+        group_data.append({
+            "group": group,
+            "student_count": len(students),
+        })
+
+    return render_template("teacher/groups.html", group_data=group_data)
+
+
+@teacher_bp.route("/groups/create", methods=["GET", "POST"])
+@login_required
+def create_group():
+    """Create a new group."""
+    from services.group_service import create_group as create_group_service
+
+    require_teacher_or_admin()
+
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+
+        try:
+            group = create_group_service(
+                name=name,
+                organization_id=current_user.organization_id,
+                created_by_id=current_user.id,
+            )
+            flash(f"Group '{group.name}' created successfully!", "success")
+            return redirect(url_for("teacher.group_detail", group_id=group.id))
+        except ValueError as e:
+            flash(str(e), "error")
+
+    return render_template("teacher/create_group.html")
+
+
+@teacher_bp.route("/groups/<int:group_id>")
+@login_required
+def group_detail(group_id):
+    """View group details and manage members."""
+    from services.group_service import (
+        get_group_by_id,
+        get_students_in_group,
+        get_group_progress_summary,
+    )
+    from services.user_service import get_students_by_teacher
+    from services.template_service import get_templates_by_organization
+
+    require_teacher_or_admin()
+
+    group = get_group_by_id(group_id)
+    if not group or group.organization_id != current_user.organization_id:
+        flash("Group not found", "error")
+        return redirect(url_for("teacher.groups"))
+
+    # Get students in group
+    group_students = get_students_in_group(group_id)
+    group_student_ids = [s.id for s in group_students]
+
+    # Get progress summary
+    progress_data = get_group_progress_summary(group_id)
+
+    # Get all students for adding to group
+    all_students = get_students_by_teacher(current_user.id)
+    available_students = [s for s in all_students if s.id not in group_student_ids]
+
+    # Get available domains
+    all_domains = Domain.query.all()
+
+    # Get templates
+    templates = get_templates_by_organization(current_user.organization_id)
+
+    return render_template(
+        "teacher/group_detail.html",
+        group=group,
+        progress_data=progress_data,
+        available_students=available_students,
+        available_domains=all_domains,
+        templates=templates,
+    )
+
+
+@teacher_bp.route("/groups/<int:group_id>/add-student", methods=["POST"])
+@login_required
+def add_student_to_group(group_id):
+    """Add a student to a group."""
+    from services.group_service import (
+        get_group_by_id,
+        add_student_to_group as add_student_service,
+    )
+
+    require_teacher_or_admin()
+
+    group = get_group_by_id(group_id)
+    if not group or group.organization_id != current_user.organization_id:
+        flash("Group not found", "error")
+        return redirect(url_for("teacher.groups"))
+
+    student_id = request.form.get("student_id", type=int)
+    if not student_id:
+        flash("No student selected", "error")
+        return redirect(url_for("teacher.group_detail", group_id=group_id))
+
+    try:
+        add_student_service(group_id, student_id)
+        student = User.query.get(student_id)
+        flash(f"Added {student.get_full_name()} to {group.name}", "success")
+    except ValueError as e:
+        flash(str(e), "error")
+
+    return redirect(url_for("teacher.group_detail", group_id=group_id))
+
+
+@teacher_bp.route("/groups/<int:group_id>/remove-student", methods=["POST"])
+@login_required
+def remove_student_from_group(group_id):
+    """Remove a student from a group."""
+    from services.group_service import (
+        get_group_by_id,
+        remove_student_from_group as remove_student_service,
+    )
+
+    require_teacher_or_admin()
+
+    group = get_group_by_id(group_id)
+    if not group or group.organization_id != current_user.organization_id:
+        flash("Group not found", "error")
+        return redirect(url_for("teacher.groups"))
+
+    student_id = request.form.get("student_id", type=int)
+    if not student_id:
+        flash("No student selected", "error")
+        return redirect(url_for("teacher.group_detail", group_id=group_id))
+
+    try:
+        remove_student_service(group_id, student_id)
+        student = User.query.get(student_id)
+        flash(f"Removed {student.get_full_name()} from {group.name}", "success")
+    except ValueError as e:
+        flash(str(e), "error")
+
+    return redirect(url_for("teacher.group_detail", group_id=group_id))
+
+
+@teacher_bp.route("/groups/<int:group_id>/assign-domain", methods=["POST"])
+@login_required
+def bulk_assign_domain(group_id):
+    """Assign a domain to all students in a group."""
+    from services.group_service import get_group_by_id, bulk_assign_domain_to_group
+
+    require_teacher_or_admin()
+
+    group = get_group_by_id(group_id)
+    if not group or group.organization_id != current_user.organization_id:
+        flash("Group not found", "error")
+        return redirect(url_for("teacher.groups"))
+
+    domain_id = request.form.get("domain_id", type=int)
+    if not domain_id:
+        flash("No domain selected", "error")
+        return redirect(url_for("teacher.group_detail", group_id=group_id))
+
+    result = bulk_assign_domain_to_group(group_id, domain_id, current_user.id)
+
+    domain = Domain.query.get(domain_id)
+    flash(
+        f"Assigned {domain.name}: {result['assigned']} added, "
+        f"{result['skipped']} already had it",
+        "success",
+    )
+
+    return redirect(url_for("teacher.group_detail", group_id=group_id))
+
+
+@teacher_bp.route("/groups/<int:group_id>/apply-template", methods=["POST"])
+@login_required
+def apply_template_to_group(group_id):
+    """Apply an assignment template to a group."""
+    from services.group_service import get_group_by_id
+    from services.template_service import (
+        apply_template_to_group as apply_template_service,
+    )
+
+    require_teacher_or_admin()
+
+    group = get_group_by_id(group_id)
+    if not group or group.organization_id != current_user.organization_id:
+        flash("Group not found", "error")
+        return redirect(url_for("teacher.groups"))
+
+    template_id = request.form.get("template_id", type=int)
+    if not template_id:
+        flash("No template selected", "error")
+        return redirect(url_for("teacher.group_detail", group_id=group_id))
+
+    try:
+        result = apply_template_service(template_id, group_id, current_user.id)
+        flash(
+            f"Applied '{result['template_name']}': {result['total_assigned']} "
+            f"assignments added, {result['total_skipped']} skipped",
+            "success",
+        )
+    except ValueError as e:
+        flash(str(e), "error")
+
+    return redirect(url_for("teacher.group_detail", group_id=group_id))
+
+
+@teacher_bp.route("/groups/<int:group_id>/deactivate", methods=["POST"])
+@login_required
+def deactivate_group(group_id):
+    """Deactivate a group."""
+    from services.group_service import get_group_by_id, deactivate_group as deactivate
+
+    require_teacher_or_admin()
+
+    group = get_group_by_id(group_id)
+    if not group or group.organization_id != current_user.organization_id:
+        flash("Group not found", "error")
+        return redirect(url_for("teacher.groups"))
+
+    try:
+        deactivate(group_id)
+        flash(f"Group '{group.name}' deactivated", "success")
+    except ValueError as e:
+        flash(str(e), "error")
+
+    return redirect(url_for("teacher.groups"))
+
+
+# ============================================================================
+# END GROUP MANAGEMENT ROUTES
+# ============================================================================
+
+
+# ============================================================================
+# BULK IMPORT ROUTES
+# ============================================================================
+
+
+@teacher_bp.route("/students/bulk-import", methods=["GET", "POST"])
+@login_required
+def bulk_import():
+    """Bulk import students from CSV."""
+    from services.bulk_import_service import bulk_import_students, generate_sample_csv
+    from services.group_service import get_groups_by_organization
+
+    require_teacher_or_admin()
+
+    groups = get_groups_by_organization(current_user.organization_id)
+
+    if request.method == "POST":
+        if "csv_file" not in request.files:
+            flash("No file uploaded", "error")
+            return redirect(url_for("teacher.bulk_import"))
+
+        file = request.files["csv_file"]
+        if file.filename == "":
+            flash("No file selected", "error")
+            return redirect(url_for("teacher.bulk_import"))
+
+        if not file.filename.endswith(".csv"):
+            flash("File must be a CSV", "error")
+            return redirect(url_for("teacher.bulk_import"))
+
+        group_id = request.form.get("group_id", type=int)
+
+        try:
+            csv_content = file.read().decode("utf-8")
+            result = bulk_import_students(
+                csv_content=csv_content,
+                organization_id=current_user.organization_id,
+                created_by_id=current_user.id,
+                group_id=group_id if group_id else None,
+            )
+
+            return render_template(
+                "teacher/import_results.html",
+                result=result,
+                group_id=group_id,
+            )
+
+        except Exception as e:
+            flash(f"Error processing CSV: {str(e)}", "error")
+            return redirect(url_for("teacher.bulk_import"))
+
+    sample_csv = generate_sample_csv()
+    return render_template(
+        "teacher/bulk_import.html",
+        groups=groups,
+        sample_csv=sample_csv,
+    )
+
+
+@teacher_bp.route("/students/bulk-import/sample")
+@login_required
+def download_sample_csv():
+    """Download sample CSV template."""
+    from flask import Response
+    from services.bulk_import_service import generate_sample_csv
+
+    require_teacher_or_admin()
+
+    csv_content = generate_sample_csv()
+
+    return Response(
+        csv_content,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment;filename=student_import_template.csv"},
+    )
+
+
+# ============================================================================
+# END BULK IMPORT ROUTES
+# ============================================================================
+
+
+# ============================================================================
+# ASSIGNMENT TEMPLATE ROUTES
+# ============================================================================
+
+
+@teacher_bp.route("/templates")
+@login_required
+def templates():
+    """List all assignment templates."""
+    from services.template_service import (
+        get_templates_by_organization,
+        get_template_domains,
+    )
+
+    require_teacher_or_admin()
+
+    all_templates = get_templates_by_organization(current_user.organization_id)
+
+    # Add domain info to each template
+    template_data = []
+    for template in all_templates:
+        domains = get_template_domains(template.id)
+        template_data.append({
+            "template": template,
+            "domains": domains,
+            "domain_count": len(domains),
+        })
+
+    return render_template("teacher/templates.html", template_data=template_data)
+
+
+@teacher_bp.route("/templates/create", methods=["GET", "POST"])
+@login_required
+def create_template():
+    """Create a new assignment template."""
+    from services.template_service import create_template as create_template_service
+    from services.domain_service import get_visible_domains
+
+    require_teacher_or_admin()
+
+    # Get available domains
+    available_domains = get_visible_domains(
+        current_user.id, current_user.organization_id
+    )
+
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        domain_ids = request.form.getlist("domain_ids", type=int)
+
+        try:
+            template = create_template_service(
+                name=name,
+                domain_ids=domain_ids,
+                organization_id=current_user.organization_id,
+                created_by_id=current_user.id,
+            )
+            flash(f"Template '{template.name}' created successfully!", "success")
+            return redirect(url_for("teacher.templates"))
+        except ValueError as e:
+            flash(str(e), "error")
+
+    return render_template(
+        "teacher/create_template.html",
+        available_domains=available_domains,
+    )
+
+
+@teacher_bp.route("/templates/<int:template_id>/delete", methods=["POST"])
+@login_required
+def delete_template(template_id):
+    """Delete an assignment template."""
+    from services.template_service import get_template_by_id, delete_template as delete
+
+    require_teacher_or_admin()
+
+    template = get_template_by_id(template_id)
+    if not template or template.organization_id != current_user.organization_id:
+        flash("Template not found", "error")
+        return redirect(url_for("teacher.templates"))
+
+    try:
+        name = template.name
+        delete(template_id)
+        flash(f"Template '{name}' deleted", "success")
+    except ValueError as e:
+        flash(str(e), "error")
+
+    return redirect(url_for("teacher.templates"))
+
+
+# ============================================================================
+# END ASSIGNMENT TEMPLATE ROUTES
 # ============================================================================

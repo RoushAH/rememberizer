@@ -77,6 +77,12 @@ class User(db.Model):
     )  # For first-time password setup
     setup_token_expires = db.Column(db.DateTime, nullable=True)  # Token expiration
 
+    # Streak tracking fields
+    current_streak = db.Column(db.Integer, default=0, nullable=False)
+    longest_streak = db.Column(db.Integer, default=0, nullable=False)
+    last_practice_date = db.Column(db.Date, nullable=True)  # Date only, not datetime
+    daily_goal = db.Column(db.Integer, default=20, nullable=False)  # Questions per day
+
     organization = db.relationship("Organization", back_populates="users")
     domain_assignments = db.relationship(
         "UserDomainAssignment",
@@ -174,3 +180,88 @@ class FactState(db.Model):
 
     fact = db.relationship("Fact", backref="state")
     user = db.relationship("User")
+
+
+class DailyProgress(db.Model):
+    """Pre-aggregated daily statistics for efficient historical queries."""
+
+    __tablename__ = "daily_progress"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    questions_answered = db.Column(db.Integer, default=0)
+    questions_correct = db.Column(db.Integer, default=0)
+    facts_mastered = db.Column(db.Integer, default=0)
+    time_spent_minutes = db.Column(db.Integer, default=0)
+
+    __table_args__ = (db.UniqueConstraint("user_id", "date", name="uq_user_date"),)
+
+    user = db.relationship("User")
+
+
+class StudentGroup(db.Model):
+    """Named groups of students (e.g., 'Period 1', 'Math Class')."""
+
+    __tablename__ = "student_groups"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    organization_id = db.Column(
+        db.Integer, db.ForeignKey("organizations.id"), nullable=False
+    )
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    is_active = db.Column(db.Boolean, default=True)
+
+    organization = db.relationship("Organization")
+    creator = db.relationship("User", foreign_keys=[created_by])
+    memberships = db.relationship(
+        "StudentGroupMembership", back_populates="group", cascade="all, delete-orphan"
+    )
+
+
+class StudentGroupMembership(db.Model):
+    """Many-to-many relationship between students and groups."""
+
+    __tablename__ = "student_group_memberships"
+
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    group_id = db.Column(
+        db.Integer, db.ForeignKey("student_groups.id"), nullable=False
+    )
+    added_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint("student_id", "group_id", name="uq_student_group"),
+    )
+
+    student = db.relationship("User")
+    group = db.relationship("StudentGroup", back_populates="memberships")
+
+
+class AssignmentTemplate(db.Model):
+    """Saved domain sets for quick assignment to groups."""
+
+    __tablename__ = "assignment_templates"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    domain_ids = db.Column(db.Text, nullable=False)  # JSON list of domain IDs
+    organization_id = db.Column(
+        db.Integer, db.ForeignKey("organizations.id"), nullable=False
+    )
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    organization = db.relationship("Organization")
+    creator = db.relationship("User", foreign_keys=[created_by])
+
+    def get_domain_ids(self):
+        """Parse and return domain IDs as a list."""
+        return json.loads(self.domain_ids)
+
+    def set_domain_ids(self, ids):
+        """Store domain IDs as JSON."""
+        self.domain_ids = json.dumps(ids)

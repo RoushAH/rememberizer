@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Create Template{% endblock %}
+
+{% block header_title %}{{ "CREATE TEMPLATE" | center_in_box }}{% endblock %}
+
+{% block content %}
+<div class="content">
+    <h2>&gt; NEW ASSIGNMENT TEMPLATE</h2>
+
+    <div class="info-box">
+        <p>Create a template by selecting domains to include.</p>
+        <p>You can then apply this template to groups for bulk assignment.</p>
+    </div>
+
+    <form method="POST" class="create-form">
+        <div class="form-group">
+            <label for="name">Template Name:</label>
+            <input type="text" id="name" name="name" class="form-input" required
+                   placeholder="e.g., Unit 1 - Greek Mythology">
+        </div>
+
+        <div class="form-group">
+            <label>Select Domains:</label>
+            <div style="max-height: 300px; overflow-y: auto; border: 1px solid #00FF00; padding: 10px; margin-top: 10px;">
+                {% for domain in available_domains %}
+                <div style="margin: 10px 0;">
+                    <label style="cursor: pointer;">
+                        <input type="checkbox" name="domain_ids" value="{{ domain.id }}"
+                               style="margin-right: 10px;">
+                        {{ domain.name }}
+                        <span style="color: #00AA00; font-size: 12px;">
+                            ({{ domain.facts|length }} facts)
+                        </span>
+                    </label>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="submit-button">[CREATE TEMPLATE]</button>
+        </div>
+    </form>
+
+    <div class="button-container">
+        <a href="{{ url_for('teacher.templates') }}" class="action-button">[CANCEL]</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block footer_text %}Create Template{% endblock %}

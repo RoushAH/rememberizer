@@ -18,6 +18,18 @@
             <p>Facts: {{ domain.id | progress_string }}</p>
         </div>
 
+        {% if is_missed_learning %}
+        <div style="border: 1px solid #666; padding: 10px; margin: 10px 0; background: #1a1a1a;">
+            <pre style="margin: 0;">
+┌────────────────────────────────────────────────────────────────┐
+│ [INFO] OUT OF ORDER                                            │
+│ This fact was skipped. Later facts have been learned.          │
+│ Please learn this fact to fill the gap in your progress.       │
+└────────────────────────────────────────────────────────────────┘
+            </pre>
+        </div>
+        {% endif %}
+
         {% if session.get("doom_loop_active") %}
         <div class="recovery-mode-indicator">
             <p>RECOVERY MODE - Focus on building confidence</p>

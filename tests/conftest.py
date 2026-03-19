@@ -245,3 +245,72 @@ def user_with_progress(app, student_user, assigned_domain):
 
         db.session.commit()
         return student_user
+
+
+@pytest.fixture
+def muses_domain(app):
+    """Load the Greek Muses domain with duplicate symbols."""
+    with app.app_context():
+        import json
+        import os
+
+        facts_dir = os.path.join(os.path.dirname(__file__), "..", "facts")
+        muses_file = os.path.join(facts_dir, "greek_muses.json")
+
+        # Load the JSON file
+        with open(muses_file, "r", encoding="utf-8") as f:
+            domain_dict = json.load(f)
+
+        # Delete any existing domain with this name (for test isolation)
+        existing = Domain.query.filter_by(name=domain_dict["domain_name"]).first()
+        if existing:
+            Fact.query.filter_by(domain_id=existing.id).delete()
+            db.session.delete(existing)
+            db.session.commit()
+
+        # Create domain directly
+        domain = Domain(name=domain_dict["domain_name"], filename="greek_muses.json")
+        domain.set_field_names(domain_dict["fields"])
+        db.session.add(domain)
+        db.session.flush()
+
+        # Add facts
+        for fact_data in domain_dict["facts"]:
+            fact = Fact(domain_id=domain.id)
+            fact.set_fact_data(fact_data)
+            db.session.add(fact)
+
+        db.session.commit()
+
+        yield domain
+
+        # Cleanup
+        Fact.query.filter_by(domain_id=domain.id).delete()
+        db.session.delete(domain)
+        db.session.commit()
+
+
+@pytest.fixture
+def erato_and_terpsichore(app, muses_domain):
+    """Get Erato and Terpsichore facts (both have 'Lyre' symbol)."""
+    with app.app_context():
+        facts = Fact.query.filter_by(domain_id=muses_domain.id).all()
+
+        erato = None
+        terpsichore = None
+
+        for fact in facts:
+            data = fact.get_fact_data()
+            if data.get("name") == "Erato":
+                erato = fact
+            elif data.get("name") == "Terpsichore":
+                terpsichore = fact
+
+        assert erato is not None, "Erato not found in muses domain"
+        assert terpsichore is not None, "Terpsichore not found in muses domain"
+
+        # Verify both have "Lyre" as symbol
+        assert erato.get_fact_data()["symbol"] == "Lyre"
+        assert terpsichore.get_fact_data()["symbol"] == "Lyre"
+
+        yield (erato, terpsichore)

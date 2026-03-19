@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Bulk Import Students{% endblock %}
+
+{% block header_title %}{{ "BULK IMPORT" | center_in_box }}{% endblock %}
+
+{% block content %}
+<div class="content">
+    <h2>&gt; IMPORT STUDENTS FROM CSV</h2>
+
+    <div class="info-box">
+        <p>Upload a CSV file to create multiple student accounts at once.</p>
+        <p>Required columns: <strong>first_name</strong>, <strong>last_name</strong>, <strong>email</strong></p>
+        <p>Students will receive setup links to create their passwords.</p>
+    </div>
+
+    <h3 style="margin: 20px 0 10px 0;">&gt; SAMPLE CSV FORMAT</h3>
+    <pre style="background-color: #001a00; border: 1px solid #00FF00; padding: 15px; overflow-x: auto; margin-bottom: 20px;">{{ sample_csv }}</pre>
+
+    <div class="button-container" style="margin-bottom: 30px;">
+        <a href="{{ url_for('teacher.download_sample_csv') }}" class="action-button">[DOWNLOAD TEMPLATE]</a>
+    </div>
+
+    <h2>&gt; UPLOAD CSV FILE</h2>
+
+    <form method="POST" enctype="multipart/form-data" class="create-form">
+        <div class="form-group">
+            <label for="csv_file">CSV File:</label>
+            <input type="file" id="csv_file" name="csv_file" accept=".csv" class="form-input" required>
+        </div>
+
+        {% if groups|length > 0 %}
+        <div class="form-group">
+            <label for="group_id">Add to Group (optional):</label>
+            <select id="group_id" name="group_id" class="form-input">
+                <option value="">-- No group --</option>
+                {% for group in groups %}
+                <option value="{{ group.id }}">{{ group.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        <div class="form-actions">
+            <button type="submit" class="submit-button">[IMPORT STUDENTS]</button>
+        </div>
+    </form>
+
+    <div class="button-container">
+        <a href="{{ url_for('teacher.groups') }}" class="action-button">[BACK TO GROUPS]</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block footer_text %}Bulk Import Students{% endblock %}

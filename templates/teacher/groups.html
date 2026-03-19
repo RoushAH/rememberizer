@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Student Groups{% endblock %}
+
+{% block header_title %}{{ "STUDENT GROUPS" | center_in_box }}{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="navigation" style="margin-bottom: 20px;">
+        <a href="{{ url_for('teacher.dashboard') }}" class="btn-view">[MY STUDENTS]</a>
+        <a href="{{ url_for('teacher.domains') }}" class="btn-view">[MY DOMAINS]</a>
+        <a href="{{ url_for('teacher.groups') }}" class="btn-view" style="background-color: #2a5a2a;">[GROUPS]</a>
+        <a href="{{ url_for('teacher.templates') }}" class="btn-view">[TEMPLATES]</a>
+        <a href="{{ url_for('analytics.dashboard') }}" class="btn-view">[ANALYTICS]</a>
+    </div>
+
+    <h2>&gt; MY GROUPS ({{ group_data|length }})</h2>
+
+    {% if group_data|length == 0 %}
+        <div class="info-box">
+            <p>You haven't created any groups yet.</p>
+            <p>Groups help you organize students and assign domains in bulk.</p>
+        </div>
+    {% else %}
+        <div class="student-list">
+            {% for data in group_data %}
+            <div class="student-item">
+                <div class="student-header">
+                    <div>
+                        <div class="student-name">{{ data.group.name }}</div>
+                        <div class="student-info">Students: {{ data.student_count }}</div>
+                        <div class="student-info">Created: {{ data.group.created_at.strftime('%Y-%m-%d') }}</div>
+                    </div>
+                </div>
+                <div class="student-actions">
+                    <a href="{{ url_for('teacher.group_detail', group_id=data.group.id) }}" class="btn-view">[VIEW/MANAGE]</a>
+                    <form method="POST" action="{{ url_for('teacher.deactivate_group', group_id=data.group.id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to deactivate this group?');">
+                        <button type="submit" class="btn-danger">[DEACTIVATE]</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="button-container">
+        <a href="{{ url_for('teacher.create_group') }}" class="action-button">[CREATE NEW GROUP]</a>
+        <a href="{{ url_for('teacher.bulk_import') }}" class="action-button">[BULK IMPORT STUDENTS]</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block footer_text %}Group Management{% endblock %}

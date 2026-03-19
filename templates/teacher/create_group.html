@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Create Group{% endblock %}
+
+{% block header_title %}{{ "CREATE GROUP" | center_in_box }}{% endblock %}
+
+{% block content %}
+<div class="content">
+    <h2>&gt; NEW GROUP</h2>
+
+    <div class="info-box">
+        <p>Create a group to organize students (e.g., "Period 1", "Advanced Math").</p>
+        <p>You can add students and assign domains to groups in bulk.</p>
+    </div>
+
+    <form method="POST" class="create-form">
+        <div class="form-group">
+            <label for="name">Group Name:</label>
+            <input type="text" id="name" name="name" class="form-input" required
+                   placeholder="e.g., Period 1, Math Class">
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="submit-button">[CREATE GROUP]</button>
+        </div>
+    </form>
+
+    <div class="button-container">
+        <a href="{{ url_for('teacher.groups') }}" class="action-button">[CANCEL]</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block footer_text %}Create Group{% endblock %}

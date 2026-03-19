@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Import Results{% endblock %}
+
+{% block header_title %}{{ "IMPORT RESULTS" | center_in_box }}{% endblock %}
+
+{% block content %}
+<div class="content">
+    <h2>&gt; IMPORT SUMMARY</h2>
+
+    <div class="stats" style="margin: 30px 0;">
+        <div class="stat-item">
+            <div class="stat-value" style="color: #00FF00;">{{ result.created }}</div>
+            <div class="stat-label">Created</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" style="color: #FFAA00;">{{ result.skipped }}</div>
+            <div class="stat-label">Skipped</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" style="color: #FF6666;">{{ result.errors|length - result.skipped }}</div>
+            <div class="stat-label">Errors</div>
+        </div>
+    </div>
+
+    {% if result.created > 0 %}
+    <div class="flash-success">
+        Successfully created {{ result.created }} student account(s)!
+        {% if group_id %}
+        Students were added to the selected group.
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if result.errors|length > 0 %}
+    <h2>&gt; DETAILS</h2>
+
+    <div class="info-box" style="max-height: 300px; overflow-y: auto;">
+        {% for error in result.errors %}
+        <p style="margin: 5px 0; {% if 'skipped' in error %}color: #FFAA00;{% else %}color: #FF6666;{% endif %}">
+            {{ error }}
+        </p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if result.created_students|length > 0 %}
+    <h2>&gt; CREATED ACCOUNTS</h2>
+
+    <div class="info-box">
+        <p>These students need to set up their passwords:</p>
+        <ul style="margin: 10px 0 10px 20px;">
+            {% for student in result.created_students %}
+            <li>{{ student.first_name }} {{ student.last_name }} ({{ student.email }})</li>
+            {% endfor %}
+        </ul>
+        <p style="color: #FFAA00; margin-top: 10px;">
+            Setup links are valid for 7 days. Share them with students or
+            display them from the student detail page.
+        </p>
+    </div>
+    {% endif %}
+
+    <div class="button-container">
+        <a href="{{ url_for('teacher.bulk_import') }}" class="action-button">[IMPORT MORE]</a>
+        <a href="{{ url_for('teacher.dashboard') }}" class="action-button">[GO TO DASHBOARD]</a>
+        {% if group_id %}
+        <a href="{{ url_for('teacher.group_detail', group_id=group_id) }}" class="action-button">[VIEW GROUP]</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block footer_text %}Import Complete{% endblock %}

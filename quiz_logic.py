@@ -65,6 +65,48 @@ def select_next_fact(domain_id, question_count, user_id):
     return random.choice(least_practiced)
 
 
+def select_least_recently_attempted(domain_id, user_id):
+    """
+    Select the fact that was attempted longest ago.
+
+    Used for reviewing fully-mastered domains.
+
+    Args:
+        domain_id: Domain ID
+        user_id: User ID
+
+    Returns:
+        Fact object with oldest last attempt, or None if no facts
+    """
+    from models import Attempt
+
+    # Get all facts in domain
+    facts = Fact.query.filter_by(domain_id=domain_id).all()
+
+    if not facts:
+        return None
+
+    # Find fact with oldest last attempt
+    fact_last_attempts = []
+    for fact in facts:
+        last_attempt = (
+            Attempt.query.filter_by(fact_id=fact.id, user_id=user_id)
+            .order_by(Attempt.timestamp.desc())
+            .first()
+        )
+
+        if last_attempt:
+            fact_last_attempts.append((fact, last_attempt.timestamp))
+        else:
+            # Fact has no attempts (shouldn't happen in mastered domain, but safety)
+            fact_last_attempts.append((fact, datetime.min))
+
+    # Sort by timestamp (oldest first)
+    fact_last_attempts.sort(key=lambda x: x[1])
+
+    return fact_last_attempts[0][0]
+
+
 def select_random_field(fact):
     """
     Select a random field from a fact to quiz.

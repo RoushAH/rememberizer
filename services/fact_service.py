@@ -157,6 +157,58 @@ def mark_fact_shown(fact_id, user_id):
     return state
 
 
+def get_out_of_order_facts(domain_id, user_id):
+    """
+    Get facts that are out of order - unlearned facts that come BEFORE learned facts.
+
+    A fact is out-of-order when:
+    - The fact is unlearned (learned_at is NULL)
+    - At least one fact with a HIGHER ID (later in sequence) IS learned
+
+    This indicates a gap in learning progression.
+
+    Args:
+        domain_id: ID of the domain
+        user_id: ID of the user
+
+    Returns:
+        list: List of Fact objects that are out of order
+    """
+    # Get all facts in order
+    facts = Fact.query.filter_by(domain_id=domain_id).order_by(Fact.id).all()
+
+    if not facts:
+        return []
+
+    # Build a map of fact_id -> learned status
+    fact_states = {}
+    for fact in facts:
+        state = FactState.query.filter_by(fact_id=fact.id, user_id=user_id).first()
+        is_learned = state and state.learned_at is not None
+        fact_states[fact.id] = is_learned
+
+    # Find out-of-order facts
+    out_of_order = []
+
+    for i, fact in enumerate(facts):
+        # Skip if this fact is already learned
+        if fact_states[fact.id]:
+            continue
+
+        # Check if any LATER fact (higher ID) is learned
+        has_later_learned = False
+        for j in range(i + 1, len(facts)):
+            if fact_states[facts[j].id]:
+                has_later_learned = True
+                break
+
+        # If there's a later learned fact, this one is out of order
+        if has_later_learned:
+            out_of_order.append(fact)
+
+    return out_of_order
+
+
 def is_fact_learned(fact_id, user_id):
     """
     Check if fact is in learned state for a specific user.

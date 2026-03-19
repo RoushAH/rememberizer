@@ -1,13 +1,26 @@
-"""Manual database initialization script.
+"""Initialize the database with tables and sample data."""
 
-Run this script to manually initialize the database and load fact domains.
-Normally, the database initializes automatically on first request.
-"""
+import os
+import sys
 
-from app import init_database
+# Add project directory to path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from app import app, init_database
+
+def main():
+    """Initialize the database."""
+    print("\nInitializing database...")
+    from app import DB_PATH
+    print(f"Database location: {DB_PATH}")
+
+    # Set testing flag to skip interactive prompts
+    app.config["TESTING"] = True
+
+    # Initialize the database
+    init_database()
+
+    print("\nDatabase initialization complete!")
 
 if __name__ == "__main__":
-    print("Initializing database...")
-    init_database()
-    print("Database initialized successfully!")
-    print("All fact domains have been loaded from the 'facts' directory.")
+    main()

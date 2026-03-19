@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics Dashboard{% endblock %}
+
+{% block header_title %}{{ "ANALYTICS DASHBOARD" | center_in_box }}{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    .chart-container {
+        background-color: #001a00;
+        border: 2px solid #00FF00;
+        padding: 20px;
+        margin: 20px 0;
+        position: relative;
+        height: 300px;
+    }
+    .chart-title {
+        color: #00FF00;
+        font-size: 16px;
+        font-weight: bold;
+        margin-bottom: 15px;
+    }
+    .charts-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+    @media (max-width: 800px) {
+        .charts-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    .at-risk-alert {
+        background-color: #331a00;
+        border: 2px solid #FFAA00;
+        color: #FFAA00;
+        padding: 15px;
+        margin: 20px 0;
+    }
+    .at-risk-item {
+        margin: 10px 0;
+        padding: 10px;
+        border-bottom: 1px solid #664400;
+    }
+    .at-risk-item:last-child {
+        border-bottom: none;
+    }
+    .risk-tag {
+        display: inline-block;
+        padding: 2px 8px;
+        margin: 2px;
+        font-size: 12px;
+        border: 1px solid;
+    }
+    .risk-inactive { border-color: #FFAA00; color: #FFAA00; }
+    .risk-struggling { border-color: #FF6666; color: #FF6666; }
+    .risk-declining { border-color: #FF6666; color: #FF6666; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="navigation" style="margin-bottom: 20px;">
+        <a href="{{ url_for('teacher.dashboard') }}" class="btn-view">[MY STUDENTS]</a>
+        <a href="{{ url_for('teacher.domains') }}" class="btn-view">[MY DOMAINS]</a>
+        <a href="{{ url_for('teacher.groups') }}" class="btn-view">[GROUPS]</a>
+        <a href="{{ url_for('teacher.templates') }}" class="btn-view">[TEMPLATES]</a>
+        <a href="{{ url_for('analytics.dashboard') }}" class="btn-view" style="background-color: #2a5a2a;">[ANALYTICS]</a>
+    </div>
+
+    <h2>&gt; CLASS SUMMARY</h2>
+
+    <div class="stats" style="margin: 30px 0;">
+        <div class="stat-item">
+            <div class="stat-value">{{ summary.total_students }}</div>
+            <div class="stat-label">Students</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ summary.active_today }}</div>
+            <div class="stat-label">Active Today</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ summary.questions_today }}</div>
+            <div class="stat-label">Questions Today</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ summary.accuracy }}%</div>
+            <div class="stat-label">Overall Accuracy</div>
+        </div>
+    </div>
+
+    {% if at_risk|length > 0 %}
+    <div class="at-risk-alert">
+        <h3 style="margin: 0 0 15px 0;">[!] STUDENTS NEEDING ATTENTION ({{ at_risk|length }})</h3>
+        {% for student in at_risk %}
+        <div class="at-risk-item">
+            <strong>{{ student.name }}</strong>
+            <span style="color: #888;">({{ student.email }})</span>
+            <br>
+            {% for reason in student.reasons %}
+                {% if reason == 'inactive' %}
+                <span class="risk-tag risk-inactive">INACTIVE</span>
+                {% elif reason == 'struggling' %}
+                <span class="risk-tag risk-struggling">STRUGGLING</span>
+                {% elif reason == 'declining' %}
+                <span class="risk-tag risk-declining">DECLINING</span>
+                {% endif %}
+            {% endfor %}
+            <a href="{{ url_for('analytics.student_analytics', student_id=student.student_id) }}"
+               style="margin-left: 10px; color: #00FF00;">[VIEW]</a>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <h2>&gt; PROGRESS CHARTS</h2>
+
+    <div class="charts-grid">
+        <div class="chart-container">
+            <div class="chart-title">&gt; QUESTIONS ANSWERED (30 DAYS)</div>
+            <canvas id="progressChart"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <div class="chart-title">&gt; DOMAIN COMPLETION RATES</div>
+            <canvas id="completionChart"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <div class="chart-title">&gt; DOMAIN DIFFICULTY (BY MASTERY RATE)</div>
+            <canvas id="difficultyChart"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <div class="chart-title">&gt; ACTIVITY HEATMAP (14 DAYS)</div>
+            <canvas id="heatmapChart"></canvas>
+        </div>
+    </div>
+
+    <h2>&gt; DOMAIN BREAKDOWN</h2>
+
+    {% if completion_rates|length > 0 %}
+    <div class="student-list">
+        {% for domain in completion_rates %}
+        <div class="student-item">
+            <div class="student-header">
+                <div>
+                    <div class="student-name">{{ domain.domain_name }}</div>
+                    <div class="student-info">
+                        Completion: {{ domain.completion_rate }}%
+                        ({{ domain.completed_count }}/{{ domain.total_students }} students)
+                    </div>
+                </div>
+                <div>
+                    <div style="width: 100px; background-color: #001a00; border: 1px solid #00FF00; height: 20px;">
+                        <div style="width: {{ domain.completion_rate }}%; background-color: #00FF00; height: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="info-box">
+        <p>No domain data available yet. Assign domains to students to see progress.</p>
+    </div>
+    {% endif %}
+
+    <div class="button-container">
+        <a href="{{ url_for('analytics.export_csv') }}" class="action-button">[EXPORT TO CSV]</a>
+        <a href="{{ url_for('teacher.dashboard') }}" class="action-button">[BACK TO DASHBOARD]</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Terminal-themed chart colors
+const chartColors = {
+    green: '#00FF00',
+    darkGreen: '#00AA00',
+    lightGreen: '#66FF66',
+    background: '#001a00',
+    grid: '#003300',
+    orange: '#FFAA00',
+    red: '#FF6666'
+};
+
+// Common chart options for terminal aesthetic
+const commonOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: {
+            labels: {
+                color: chartColors.green,
+                font: { family: "'Courier New', monospace" }
+            }
+        }
+    },
+    scales: {
+        x: {
+            ticks: { color: chartColors.darkGreen },
+            grid: { color: chartColors.grid }
+        },
+        y: {
+            ticks: { color: chartColors.darkGreen },
+            grid: { color: chartColors.grid }
+        }
+    }
+};
+
+// Load progress chart
+fetch('{{ url_for("analytics.api_class_progress") }}')
+    .then(response => response.json())
+    .then(data => {
+        const ctx = document.getElementById('progressChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.dates,
+                datasets: [{
+                    label: 'Questions Answered',
+                    data: data.questions_answered,
+                    borderColor: chartColors.green,
+                    backgroundColor: 'rgba(0, 255, 0, 0.1)',
+                    fill: true,
+                    tension: 0.3
+                }, {
+                    label: 'Correct',
+                    data: data.questions_correct,
+                    borderColor: chartColors.lightGreen,
+                    backgroundColor: 'transparent',
+                    borderDash: [5, 5],
+                    tension: 0.3
+                }]
+            },
+            options: commonOptions
+        });
+    });
+
+// Completion rates chart
+const completionData = {{ completion_rates | tojson }};
+if (completionData.length > 0) {
+    const completionCtx = document.getElementById('completionChart').getContext('2d');
+    new Chart(completionCtx, {
+        type: 'bar',
+        data: {
+            labels: completionData.map(d => d.domain_name.substring(0, 15)),
+            datasets: [{
+                label: 'Completion Rate %',
+                data: completionData.map(d => d.completion_rate),
+                backgroundColor: chartColors.green,
+                borderColor: chartColors.lightGreen,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            ...commonOptions,
+            plugins: {
+                ...commonOptions.plugins,
+                legend: { display: false }
+            }
+        }
+    });
+}
+
+// Domain difficulty chart
+const difficultyData = {{ domain_difficulty | tojson }};
+if (difficultyData.length > 0) {
+    const difficultyCtx = document.getElementById('difficultyChart').getContext('2d');
+    new Chart(difficultyCtx, {
+        type: 'bar',
+        data: {
+            labels: difficultyData.map(d => d.domain_name.substring(0, 15)),
+            datasets: [{
+                label: 'Mastery Rate %',
+                data: difficultyData.map(d => d.mastery_rate),
+                backgroundColor: difficultyData.map(d =>
+                    d.mastery_rate < 30 ? chartColors.red :
+                    d.mastery_rate < 60 ? chartColors.orange :
+                    chartColors.green
+                ),
+                borderWidth: 1
+            }]
+        },
+        options: {
+            ...commonOptions,
+            indexAxis: 'y',
+            plugins: {
+                ...commonOptions.plugins,
+                legend: { display: false }
+            }
+        }
+    });
+}
+
+// Activity heatmap (simplified as bar chart)
+fetch('{{ url_for("analytics.api_activity_heatmap") }}')
+    .then(response => response.json())
+    .then(data => {
+        const ctx = document.getElementById('heatmapChart').getContext('2d');
+
+        // Sum activity by day
+        const dailyTotals = data.activity.map(dayData =>
+            dayData.reduce((a, b) => a + b, 0)
+        );
+
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.day_labels,
+                datasets: [{
+                    label: 'Questions by Day',
+                    data: dailyTotals,
+                    backgroundColor: chartColors.green,
+                    borderColor: chartColors.lightGreen,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                ...commonOptions,
+                plugins: {
+                    ...commonOptions.plugins,
+                    legend: { display: false }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}
+
+{% block footer_text %}Analytics Dashboard{% endblock %}

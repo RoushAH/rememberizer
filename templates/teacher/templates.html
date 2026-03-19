@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Assignment Templates{% endblock %}
+
+{% block header_title %}{{ "ASSIGNMENT TEMPLATES" | center_in_box }}{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="navigation" style="margin-bottom: 20px;">
+        <a href="{{ url_for('teacher.dashboard') }}" class="btn-view">[MY STUDENTS]</a>
+        <a href="{{ url_for('teacher.domains') }}" class="btn-view">[MY DOMAINS]</a>
+        <a href="{{ url_for('teacher.groups') }}" class="btn-view">[GROUPS]</a>
+        <a href="{{ url_for('teacher.templates') }}" class="btn-view" style="background-color: #2a5a2a;">[TEMPLATES]</a>
+        <a href="{{ url_for('analytics.dashboard') }}" class="btn-view">[ANALYTICS]</a>
+    </div>
+
+    <h2>&gt; MY TEMPLATES ({{ template_data|length }})</h2>
+
+    <div class="info-box" style="margin-bottom: 20px;">
+        <p>Templates let you save sets of domains for quick assignment.</p>
+        <p>Apply a template to a group to assign all included domains at once.</p>
+    </div>
+
+    {% if template_data|length == 0 %}
+        <div class="info-box">
+            <p>You haven't created any templates yet.</p>
+        </div>
+    {% else %}
+        <div class="student-list">
+            {% for data in template_data %}
+            <div class="student-item">
+                <div class="student-header">
+                    <div>
+                        <div class="student-name">{{ data.template.name }}</div>
+                        <div class="student-info">Domains: {{ data.domain_count }}</div>
+                        <div class="student-info">Created: {{ data.template.created_at.strftime('%Y-%m-%d') }}</div>
+                    </div>
+                </div>
+
+                {% if data.domains|length > 0 %}
+                <div class="student-progress" style="margin: 10px 0;">
+                    <strong>Includes:</strong>
+                    {% for domain in data.domains %}
+                    <span style="display: inline-block; margin: 2px 5px; padding: 2px 8px; border: 1px solid #00AA00;">
+                        {{ domain.name }}
+                    </span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="student-actions">
+                    <form method="POST" action="{{ url_for('teacher.delete_template', template_id=data.template.id) }}" style="display: inline;" onsubmit="return confirm('Delete this template?');">
+                        <button type="submit" class="btn-danger">[DELETE]</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="button-container">
+        <a href="{{ url_for('teacher.create_template') }}" class="action-button">[CREATE NEW TEMPLATE]</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block footer_text %}Assignment Templates{% endblock %}

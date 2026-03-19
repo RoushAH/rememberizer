@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Group: {{ group.name }}{% endblock %}
+
+{% block header_title %}{{ ("GROUP: " + group.name.upper()) | center_in_box }}{% endblock %}
+
+{% block content %}
+<div class="content">
+    <h2>&gt; GROUP MEMBERS ({{ progress_data|length }})</h2>
+
+    {% if progress_data|length == 0 %}
+        <div class="info-box">
+            <p>No students in this group yet.</p>
+            <p>Add students below to get started.</p>
+        </div>
+    {% else %}
+        <div class="student-list">
+            {% for data in progress_data %}
+            <div class="student-item">
+                <div class="student-header">
+                    <div>
+                        <div class="student-name">{{ data.student.first_name }} {{ data.student.last_name }}</div>
+                        <div class="student-info">Email: {{ data.student.email }}</div>
+                        <div class="student-info">
+                            Total Questions: {{ data.total_questions }}
+                            {% if data.questions_today > 0 %}
+                            | Today: {{ data.questions_today }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                {% if data.domain_progress|length > 0 %}
+                    <div class="student-progress">
+                        {% for dp in data.domain_progress %}
+                        <div style="margin: 5px 0;">
+                            <strong>{{ dp.domain.name }}:</strong> {{ dp.progress }}
+                            {% if dp.is_complete %}
+                            <span style="color: #00FF00;"> [COMPLETED]</span>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="student-info" style="margin-top: 10px;">
+                        No domains assigned yet
+                    </div>
+                {% endif %}
+
+                <div class="student-actions">
+                    <a href="{{ url_for('teacher.student_detail', student_id=data.student.id) }}" class="btn-view">[VIEW DETAILS]</a>
+                    <form method="POST" action="{{ url_for('teacher.remove_student_from_group', group_id=group.id) }}" style="display: inline;">
+                        <input type="hidden" name="student_id" value="{{ data.student.id }}">
+                        <button type="submit" class="btn-danger" onclick="return confirm('Remove from group?');">[REMOVE]</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <h2>&gt; ADD STUDENT TO GROUP</h2>
+
+    {% if available_students|length > 0 %}
+        <form method="POST" action="{{ url_for('teacher.add_student_to_group', group_id=group.id) }}" class="create-form">
+            <div class="form-group">
+                <label for="student_id">Select Student:</label>
+                <select id="student_id" name="student_id" class="form-input">
+                    {% for student in available_students %}
+                    <option value="{{ student.id }}">{{ student.first_name }} {{ student.last_name }} ({{ student.email }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="submit-button">[ADD TO GROUP]</button>
+            </div>
+        </form>
+    {% else %}
+        <div class="info-box">
+            <p>All students are already in this group.</p>
+        </div>
+    {% endif %}
+
+    <h2>&gt; BULK ASSIGN DOMAIN</h2>
+
+    <div class="info-box" style="margin-bottom: 15px;">
+        <p>Assign a domain to ALL students in this group at once.</p>
+    </div>
+
+    <form method="POST" action="{{ url_for('teacher.bulk_assign_domain', group_id=group.id) }}" class="create-form">
+        <div class="form-group">
+            <label for="domain_id">Select Domain:</label>
+            <select id="domain_id" name="domain_id" class="form-input">
+                {% for domain in available_domains %}
+                <option value="{{ domain.id }}">{{ domain.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="submit-button">[ASSIGN TO ALL]</button>
+        </div>
+    </form>
+
+    {% if templates|length > 0 %}
+    <h2>&gt; APPLY TEMPLATE</h2>
+
+    <div class="info-box" style="margin-bottom: 15px;">
+        <p>Apply a saved template to assign multiple domains at once.</p>
+    </div>
+
+    <form method="POST" action="{{ url_for('teacher.apply_template_to_group', group_id=group.id) }}" class="create-form">
+        <div class="form-group">
+            <label for="template_id">Select Template:</label>
+            <select id="template_id" name="template_id" class="form-input">
+                {% for template in templates %}
+                <option value="{{ template.id }}">{{ template.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="submit-button">[APPLY TEMPLATE]</button>
+        </div>
+    </form>
+    {% endif %}
+
+    <div class="button-container">
+        <a href="{{ url_for('teacher.groups') }}" class="action-button">[BACK TO GROUPS]</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block footer_text %}Group Management - {{ group.name }}{% endblock %}
