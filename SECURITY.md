@@ -754,6 +754,55 @@ if not domain:
     return redirect(url_for('student_domains'))
 ```
 
+### File Upload Validation (Fact Images)
+
+Teachers can upload images for fact fields. Uploads are the only route by which an
+untrusted file reaches the server's filesystem, so each layer is enforced in
+`services/image_service.py`.
+
+**Format decided by content, not extension:**
+```python
+# Extensions are attacker-controlled, so the file's actual bytes decide what it is
+detected = detect_image_type(file.read(_HEADER_BYTES))  # PNG/JPEG/GIF/WebP signature
+if detected is None:
+    raise ValueError(f"'{file.filename}' is not a recognised image file")
+if detected != declared:
+    raise ValueError(f"... has a {declared} extension but contains {detected} data")
+```
+
+**SVG is deliberately excluded** from `ALLOWED_EXTENSIONS`. Uploads are served from our
+own origin, and an SVG can carry `<script>` — allowing it would be a stored XSS vector.
+
+**Stored under a random name:**
+```python
+stored_name = f"{uuid.uuid4().hex}{detected}"
+```
+The original filename is discarded. Beyond avoiding collisions and `secure_filename`
+edge cases, this keeps the uploaded name — which in a quiz domain often *is* the answer
+("erato.png") — out of the page source.
+
+**Size limits:**
+- `MAX_IMAGE_BYTES` = 5MB per image, checked after the signature check
+- `MAX_CONTENT_LENGTH` = 25MB per request, enforced by Flask with a 413 handler that
+  returns a friendly message rather than a stack trace
+
+**Path traversal:** a hand-written `img:../../instance/database.db` never reaches the
+filesystem. `resolve_image_references()` requires every local reference to match an
+actual upload by basename and rejects anything else, which fails the whole domain
+creation. Deletion is independently confined: it resolves `os.path.basename(reference)`
+against the upload folder, so a reference cannot escape it.
+
+**Failed creation cleans up:** every error path in the create-domain route calls
+`discard_uploaded_images()`, so a rejected domain does not leave orphaned files behind.
+
+**Residual risks (accepted):**
+- **External URLs** (`img:https://...`) are not fetched or validated server-side; a
+  teacher can point at any HTTPS host, which leaks student IPs to it and lets that host
+  change the image later. Restricted to `https://` so at least the transport is secure
+- **No image re-encoding**: a file with a valid PNG signature but a malformed body is
+  stored as-is and handed to the browser's decoder
+- **No upload quota**: a teacher account can fill the disk over many requests
+
 ### HTML Escaping (XSS Prevention)
 
 **Auto-escaping in Jinja2:**

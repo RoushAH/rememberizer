@@ -21,6 +21,14 @@ app.config["SECRET_KEY"] = os.environ.get(
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+# Fact images uploaded by teachers are served from static/uploads
+app.config["UPLOAD_FOLDER"] = os.path.join(BASE_DIR, "static", "uploads")
+os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+
+# Cap on a whole request body (a domain can carry several images at once).
+# Individual images are capped separately by image_service.MAX_IMAGE_BYTES.
+app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
+
 print(f"Database configured at: {DB_PATH}")
 
 # Initialize database
@@ -80,6 +88,41 @@ def singularize_filter(domain_name):
     from quiz_logic import singularize_domain_name
 
     return singularize_domain_name(domain_name)
+
+
+@app.template_test("image_value")
+def image_value_test(value):
+    """Test whether a fact field value is an image reference."""
+    from services.image_service import is_image_value
+
+    return is_image_value(value)
+
+
+@app.template_filter("image_src")
+def image_src_filter(value):
+    """Resolve an image field value to a URL the browser can load."""
+    from services.image_service import image_src
+
+    return image_src(value)
+
+
+@app.template_global("learn_card_alt")
+def learn_card_alt_global(field_name, fact_data, identifying_field):
+    """Build descriptive alt text for an image on the fact-display card."""
+    from services.image_service import learn_card_alt
+
+    return learn_card_alt(field_name, fact_data, identifying_field)
+
+
+@app.errorhandler(413)
+def request_too_large(error):
+    """Explain an oversized upload instead of showing a bare 413."""
+    limit_mb = app.config["MAX_CONTENT_LENGTH"] // (1024 * 1024)
+    return (
+        f"Upload too large. The limit for a single request is {limit_mb}MB. "
+        f"Go back and try fewer or smaller files.",
+        413,
+    )
 
 
 def init_database():

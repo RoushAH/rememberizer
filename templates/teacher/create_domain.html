@@ -15,7 +15,7 @@
 
     <!-- Form Entry Tab -->
     <div id="form-tab" class="tab-content">
-        <form method="POST" action="{{ url_for('teacher.create_domain') }}" class="create-form">
+        <form method="POST" action="{{ url_for('teacher.create_domain') }}" enctype="multipart/form-data" class="create-form">
             <input type="hidden" name="upload_method" value="form">
 
             <div class="form-group">
@@ -47,6 +47,15 @@
                 </div>
             </div>
 
+            <div class="form-group">
+                <label for="image_files">Images (optional):</label>
+                <input type="file" id="image_files" name="image_files" multiple
+                       accept=".png,.jpg,.jpeg,.gif,.webp" class="form-input">
+                <div style="margin-top: 5px; font-size: 0.9em; color: #00aa00;">
+                    Select the image files you reference above as <code>img:filename</code>
+                </div>
+            </div>
+
             <div class="info-box">
                 <p><strong>Requirements:</strong></p>
                 <ul style="margin: 10px 0; padding-left: 20px;">
@@ -56,6 +65,20 @@
                     <li>Each fact must have all specified fields</li>
                     <li>Domain will be private to your organization by default</li>
                     <li>You can publish it later to make it available to all teachers</li>
+                </ul>
+
+                <p style="margin-top: 15px;"><strong>Using images:</strong></p>
+                <p style="margin-top: 5px;">Prefix a field value with <code>img:</code> to make it
+                   an image. Images work anywhere text does &mdash; they can be what the question
+                   shows, or what the four answer choices show.</p>
+                <pre style="background-color: #1a1a1a; padding: 10px; margin-top: 5px; border: 1px solid #00ff00; font-size: 0.85em;">{"name": "Erato", "symbol": "Lyre", "portrait": "img:erato.png"}
+{"name": "Clio",  "symbol": "Scroll", "portrait": "img:https://example.org/clio.png"}</pre>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li><code>img:erato.png</code> &mdash; upload the file below; the name must match</li>
+                    <li><code>img:https://...</code> &mdash; loaded from that URL; nothing to upload</li>
+                    <li>Allowed types: PNG, JPG, GIF, WebP. Max 5MB per image, 25MB per upload</li>
+                    <li>Give every fact an image for a field, or the answer choices will mix
+                        pictures and text</li>
                 </ul>
             </div>
 
@@ -86,6 +109,15 @@
                 </div>
             </div>
 
+            <div class="form-group">
+                <label for="csv_image_files">Images (optional):</label>
+                <input type="file" id="csv_image_files" name="image_files" multiple
+                       accept=".png,.jpg,.jpeg,.gif,.webp" class="form-input">
+                <div style="margin-top: 5px; font-size: 0.9em; color: #00aa00;">
+                    Select the image files your CSV references as <code>img:filename</code>
+                </div>
+            </div>
+
             <div class="info-box">
                 <p><strong>CSV Format:</strong></p>
                 <ul style="margin: 10px 0; padding-left: 20px;">
@@ -102,11 +134,19 @@ John Adams,Federalist,1797-1801
 Thomas Jefferson,Democratic-Republican,1801-1809
 Abraham Lincoln,Republican,1861-1865</pre>
 
+                <p style="margin-top: 15px;"><strong>Images:</strong></p>
+                <p style="margin-top: 5px;">Prefix a cell with <code>img:</code> to make it an
+                   image. Upload the named files below, or point at an https:// URL:</p>
+                <pre style="background-color: #1a1a1a; padding: 10px; margin-top: 5px; border: 1px solid #00ff00; font-size: 0.85em;">name,symbol,portrait
+Erato,Lyre,img:erato.png
+Clio,Scroll,img:https://example.org/clio.png</pre>
+
                 <p style="margin-top: 15px;"><strong>Notes:</strong></p>
                 <ul style="margin: 10px 0; padding-left: 20px;">
                     <li>Domain will be private to your organization by default</li>
                     <li>You can publish it later from the domains page</li>
-                    <li>Maximum file size: 10MB</li>
+                    <li>Allowed image types: PNG, JPG, GIF, WebP</li>
+                    <li>Maximum 5MB per image, 25MB per upload</li>
                 </ul>
             </div>
 

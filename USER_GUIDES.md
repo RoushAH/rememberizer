@@ -870,6 +870,45 @@ Let's review this fact and try again.
 
 See README.md "Adding New Fact Domains" for details.
 
+### Adding Images to Facts (Teacher)
+
+Any field of a domain you create yourself can hold a picture instead of text — a
+portrait, a map, a diagram, a chemical structure. Bundled domains that ship with the
+app are text-only.
+
+**How to do it:**
+
+1. Go to **Domains → Create Domain**
+2. Write your facts as usual, but put `img:` followed by the picture's filename where
+   you want the image to appear:
+   ```json
+   {"name": "Erato", "symbol": "Lyre", "portrait": "img:erato.png"}
+   ```
+   In a CSV, the cell reads the same way: `Erato,Lyre,img:erato.png`
+3. Attach the picture files themselves in the **Fact images** field
+4. Submit
+
+Instead of uploading, you can point at a picture already on the web:
+`img:https://example.org/erato.png`. The address must start with `https://`.
+
+**What students see:**
+- On the learn card, the picture appears in the value column next to its field name
+- In a quiz, it becomes either the thing the question asks about ("What is the symbol
+  of *this greek muse*?") or the four answer options to choose between
+
+**Rules to know:**
+- Accepted formats: PNG, JPG, GIF, WebP
+- Up to 5MB per picture, 25MB per submission
+- Every `img:` filename must match a file you attached — if one doesn't, the domain is
+  not created and you get told which reference failed. Check for typos and that the
+  extension matches exactly (`img:erato.png` will not match `erato.jpg`)
+- For a field to be used as *image answer options*, at least 4 facts need a different
+  picture in that field. With fewer, the field is still shown while learning and can
+  still be the question's context
+
+**Tip**: pictures work best in a domain where they are genuinely the thing being
+learned. A decorative image in every fact makes the answer options harder to tell apart.
+
 ### Exporting Student Data
 
 **Teacher workflow**:

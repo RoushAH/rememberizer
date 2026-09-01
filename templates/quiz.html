@@ -40,13 +40,24 @@
 
             <div class="question">
                 <p class="question-text">{{ question }}</p>
+                {# Alt text stays generic: naming the subject could give the answer away #}
+                {% if context_image %}
+                <img class="question-image" src="{{ context_image | image_src }}"
+                     alt="Image referred to by the question">
+                {% endif %}
             </div>
 
             <form method="POST" action="{{ url_for('quiz.answer') }}" class="quiz-form">
                 <div class="options">
                     {% for option in options %}
                     <button type="submit" name="answer" value="{{ loop.index0 }}" class="option-button">
+                        {% if option is image_value %}
+                        [{{ loop.index }}]
+                        <img class="option-image" src="{{ option | image_src }}"
+                             alt="Option {{ loop.index }}">
+                        {% else %}
                         [{{ loop.index }}] {{ option }}
+                        {% endif %}
                     </button>
                     {% endfor %}
                 </div>

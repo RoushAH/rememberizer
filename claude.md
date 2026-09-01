@@ -237,6 +237,87 @@ rememberizer/
 
 ---
 
+## 2026-09-01: Fact Images
+
+### Overview
+Fact fields can now hold images as well as text, in teacher-created domains.
+
+### Data Model: Inline Markers
+An image is a field **value** prefixed with `img:`, not a typed field:
+
+```python
+{"name": "Erato", "symbol": "Lyre", "portrait": "img:uploads/a3f9c1e8.png"}
+{"name": "Erato", "portrait": "img:https://example.org/erato.png"}
+```
+
+Chosen over a `field_types` map or per-fact image columns because it needs **no schema
+change and no migration**: `Domain.field_names` stays a list of plain strings, its ~10
+consumers were untouched, and `/answer` grading still compares raw strings. The cost is
+that there is nowhere to store real alt text — see ARCHITECTURE.md decision 9.
+
+### Changes Made
+
+**1. New service: `services/image_service.py`** (316 lines)
+- `is_image_value` / `image_reference` / `is_external_reference` — marker parsing
+- `detect_image_type` — PNG/JPEG/GIF/WebP identified by signature, not extension
+- `save_uploaded_image` / `save_uploaded_images` — validate and store under a
+  `uuid4` name; roll back already-stored files if a later file is rejected
+- `discard_uploaded_images` — clean up when domain creation fails
+- `resolve_image_references` — rewrite `img:erato.png` to the stored path by matching
+  uploads on basename; pass `https://` through; reject everything else
+- `image_src` / `learn_card_alt` — template helpers
+
+**2. `app.py`**
+- `UPLOAD_FOLDER` config (`static/uploads`, created at startup)
+- `MAX_CONTENT_LENGTH` = 25MB with a 413 errorhandler
+- Three Jinja hooks: `image_value` test, `image_src` filter, `learn_card_alt` global
+
+**3. `quiz_logic.py`**
+- `generate_question` returns a new `context_image` key. An image cannot be
+  interpolated into a sentence, so when the context is an image the question points at
+  it instead ("What is the symbol of this greek muse?")
+- `has_enough_image_distractors` — an image answer needs 3 other distinct images, or
+  the option grid would mix images with `"Option 2"` text placeholders
+- `_choose_field_pair` — extracted from the identical retry loops duplicated in
+  `prepare_quiz_question` and `prepare_quiz_question_for_fact`, now also applying the
+  distractor check
+
+**4. `blueprints/teacher.py`** — both the form and CSV branches of `create_domain`
+save uploads, resolve references, and discard uploads on every error path.
+
+**5. Templates** — `show_fact.html` (value cell), `quiz.html` (question context and
+options), `teacher/create_domain.html` (file inputs and authoring docs on both tabs).
+
+### Security Notes
+- **SVG rejected**: it can carry script and uploads are served from our own origin
+- **Random stored filenames**: the uploaded name is often the answer ("erato.png"), so
+  it is kept out of the page source
+- **Position-dependent alt text**: descriptive on the learn card, generic ("Option 2")
+  in a quiz, so alt text cannot leak the answer
+- **Traversal closed at authoring time**: a local reference that matches no upload is
+  rejected outright; deletion resolves by basename against the upload folder
+
+### Bug Found While Testing
+`discard_uploaded_images` rebuilt paths from `current_app.static_folder` while saves
+went to `UPLOAD_FOLDER`. Wherever those differ (a mounted volume in deployment) saves
+would succeed and deletes silently no-op, orphaning every file forever. Both now use
+`_upload_folder()`.
+
+### Testing
+- ✅ 42 new tests in `tests/test_image_fields.py`
+- ✅ 269 tests passing overall
+- ✅ `facts_loader.py` untouched — bundled `facts/*.json` domains stay text-only,
+  by design
+
+### Known CI Issue (pre-existing)
+`main` already fails `black --check .` (18 files) and `flake8 .` (~75 errors) with
+current tool versions — `requirements-dev.txt` pins only `black>=23.0.0`, so CI
+installs whatever is latest and formatting rules have moved. Verified against a clean
+`git archive HEAD` tree: this feature adds **no** new Black or Flake8 findings. Worth a
+separate pass that pins exact versions and clears the backlog.
+
+---
+
 ## Previous Work
 
 ### Multi-User Authentication System
@@ -266,11 +347,22 @@ rememberizer/
 rememberizer/
 ├── app.py                 # Flask app, config, filters, DB init
 ├── auth.py                # Flask-Login integration
-├── models.py              # SQLAlchemy models + business logic
+├── models.py              # SQLAlchemy models only
 ├── quiz_logic.py          # Quiz question generation
 ├── facts_loader.py        # Load domains from JSON
 ├── doom_loop.py           # Spaced repetition algorithm
-├── blueprints/            # Route handlers (NEW!)
+├── services/              # Business logic layer
+│   ├── fact_service.py
+│   ├── user_service.py
+│   ├── domain_service.py
+│   ├── progress_service.py
+│   ├── analytics_service.py
+│   ├── bulk_import_service.py
+│   ├── group_service.py
+│   ├── streak_service.py
+│   ├── template_service.py
+│   └── image_service.py   # Fact images (NEW!)
+├── blueprints/            # Route handlers
 │   ├── admin.py
 │   ├── auth_routes.py
 │   ├── quiz.py
@@ -281,7 +373,9 @@ rememberizer/
 │   ├── student/
 │   └── teacher/
 ├── tests/                 # Pytest test suite
-└── facts/                 # Domain JSON files
+├── facts/                 # Domain JSON files
+└── static/
+    └── uploads/           # Teacher-uploaded fact images (gitignored)
 ```
 
 ### Technology Stack
@@ -303,4 +397,4 @@ rememberizer/
 
 ---
 
-*Last updated: 2026-01-19*
+*Last updated: 2026-09-01*

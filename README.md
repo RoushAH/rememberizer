@@ -134,6 +134,15 @@ The application will then start normally at `http://localhost:5000`.
 - **Progress reset**: Reset progress for any domain with one click
 - **Persistent progress**: SQLite database tracks all attempts and learning states across sessions
 
+### Fact Images
+
+- **Images as field values**: Any field of a teacher-created domain can hold an image instead of text
+- **Fully quizzable**: An image can be the question's context ("What is the symbol of this greek muse?") or the four answer options
+- **Two sources**: Upload image files alongside the domain, or reference an external `https://` URL
+- **Both authoring paths**: Works with form entry and CSV upload
+- **Validated uploads**: Format checked by file signature (not extension), 5MB per image, 25MB per request
+- **No answer leaks**: Stored under random filenames so the page source never names the answer
+
 ### User Interface
 
 - **Terminal aesthetic**: Retro green-on-black interface with monospace fonts
@@ -295,7 +304,8 @@ rememberizer/
 │   └── answer_result.html       # Answer feedback page
 └── static/
     ├── style.css                # Terminal styling (green/red on black)
-    └── app.js                   # Client-side interactivity
+    ├── app.js                   # Client-side interactivity
+    └── uploads/                 # Teacher-uploaded fact images (gitignored)
 ```
 
 ## Database Schema
@@ -627,6 +637,52 @@ Create a JSON file in the `facts/` directory:
 
 The application automatically loads all JSON files from `facts/` on startup.
 
+## Adding Images to Facts
+
+Images are supported in **teacher-created domains only** (Teacher → Domains → Create
+Domain). Bundled `facts/*.json` domains are text-only.
+
+A field value holds an image by prefixing it with the `img:` marker. Field names stay
+plain strings, so a domain gains images without any schema change:
+
+```json
+{
+  "name": "Erato",
+  "symbol": "Lyre",
+  "portrait": "img:erato.png"
+}
+```
+
+The same works in a CSV cell:
+
+```csv
+name,symbol,portrait
+Erato,Lyre,img:erato.png
+```
+
+**Two ways to supply the file:**
+
+1. **Upload** — write `img:<filename>` and attach that file in the "Fact images" field
+   of the create-domain form. Filenames are matched by basename, case-insensitively.
+   The file is stored under `static/uploads/` with a random name, and the fact value
+   is rewritten to `img:uploads/<random>.png`.
+2. **External URL** — write the URL directly: `img:https://example.org/erato.png`.
+   Only `https://` is accepted.
+
+**Constraints:**
+- Allowed formats: PNG, JPG, GIF, WebP (SVG is rejected — it can carry script, and
+  uploads are served from our own origin)
+- Format is determined by the file's leading bytes, so a renamed file is rejected
+- 5MB per image, 25MB per whole request
+- Every `img:` reference must resolve to an upload or an `https://` URL; anything else
+  fails the whole domain creation, and any files already stored are cleaned up
+
+**Quizzing behaviour:** when the context field is an image, the question text points at
+it ("What is the symbol of *this greek muse*?"). When the answer field is an image, all
+four options render as images. A field is only quizzed as an image answer if the domain
+has at least 3 other distinct images in that field, so the option grid does not end up
+mixing images with text placeholders.
+
 ## Testing
 
 ### Running Tests
@@ -887,6 +943,13 @@ Contributions welcome! Please ensure:
 For issues, questions, or feature requests, please file an issue on GitHub.
 
 ## Changelog
+
+### Unreleased - Fact Images
+- Fact fields can hold images via an inline `img:` marker (no schema change)
+- Teachers upload image files or reference `https://` URLs, in both form and CSV authoring
+- Images work as quiz question context and as answer options
+- Uploads validated by file signature, capped at 5MB each / 25MB per request, SVG rejected
+- Added `services/image_service.py` and 42 tests in `tests/test_image_fields.py`
 
 ### v3.0 (2026-01-19) - Multi-User System
 - Added three-role authentication system (Admin, Teacher, Student)

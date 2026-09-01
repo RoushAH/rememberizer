@@ -245,6 +245,7 @@ def quiz():
                 "quiz.html",
                 question=question_data["question"],
                 options=question_data["options"],
+                context_image=question_data["context_image"],
                 domain=domain,
             )
         else:
@@ -285,6 +286,7 @@ def quiz():
                         "quiz.html",
                         question=question_data["question"],
                         options=question_data["options"],
+                        context_image=question_data["context_image"],
                         domain=domain,
                     )
         else:
@@ -379,6 +381,7 @@ def quiz():
         "quiz.html",
         question=question_data["question"],
         options=question_data["options"],
+        context_image=question_data["context_image"],
         domain=domain,
     )
 

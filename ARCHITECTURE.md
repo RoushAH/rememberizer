@@ -1552,6 +1552,42 @@ def get_learned_facts(domain_id, user_id):
 
 ---
 
+### 9. Inline Image Markers (vs. Typed Image Fields)
+
+**Decision**: An image is a fact field *value* prefixed with `img:`, not a field with a
+declared type.
+
+```python
+{"name": "Erato", "symbol": "Lyre", "portrait": "img:uploads/a3f9c1e8.png"}
+```
+
+**Rationale:**
+- **No migration**: `Domain.field_names` stays a JSON list of plain strings. A typed
+  field system would need a new column or table plus a migration of existing domains
+- **No consumer changes**: `field_names` has ~10 consumers (templates, quiz logic,
+  progress display); none needed touching
+- **Grading unchanged**: `options` and `session["correct_answer"]` hold the raw marker
+  strings, so the existing string comparison in `/answer` works as-is
+- **Mixed domains for free**: a field can be an image in one fact and text in another
+
+**Trade-offs:**
+- **No alt text**: there is nowhere in the value to store a real description, so alt
+  text is derived from the field name and subject. A genuine accessibility cost
+- **Marker collision**: a literal text value starting with `img:` would be misread as
+  an image. Acceptable given the fact domains in use
+- **No metadata**: no width, height, or caption without changing the convention
+
+**Alternative considered**: a `field_types` map alongside `field_names`
+(`{"portrait": "image"}`). Rejected as the migration and consumer churn bought nothing
+this feature needed.
+
+**Implementation**: `services/image_service.py` owns the convention — marker parsing,
+upload validation and storage, and reference resolution. Templates reach it through
+three Jinja hooks registered in `app.py`: the `image_value` test, the `image_src`
+filter, and the `learn_card_alt` global.
+
+---
+
 ## Performance Considerations
 
 ### Database Indexes
@@ -1738,6 +1774,11 @@ students = User.query.options(
    - Questions like "What is the pronunciation of Calliope?" generated automatically
 
 **Result**: Fully extensible fact schema with zero code changes.
+
+**Image-valued fields**: a field holds an image when its value carries the `img:`
+marker (see "Inline Image Markers" under Design Decisions). This is available in
+teacher-created domains only — `facts_loader.py` validation is unchanged, so bundled
+`facts/*.json` domains stay text-only.
 
 ### Adding New Authentication Providers
 
