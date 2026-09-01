@@ -29,7 +29,7 @@ The app now features a complete multi-user authentication and authorization syst
 - ✅ **Teacher dashboard**: View all students with progress summaries and detailed metrics
 - ✅ **Student dashboard**: See only assigned domains with personal progress
 - ✅ **70+ new tests** covering authentication, authorization, and multi-user functionality
-- ✅ **Comprehensive test coverage**: 162+ total tests with >90% code coverage
+- ✅ **Test coverage**: 269 tests, 71% overall (see Testing for where the gaps are)
 
 ### User Roles
 
@@ -250,20 +250,43 @@ The application runs on `http://localhost:5000` by default.
 
 ## Project Structure
 
+Routes live in `blueprints/`, business logic in `services/`, and `models.py` holds
+only SQLAlchemy models. See ARCHITECTURE.md for how the layers depend on each other.
+
 ```
 rememberizer/
-├── app.py                       # Main Flask application & ALL routes
-├── models.py                    # Database models & learning logic
+├── app.py                       # Flask app: config, template filters, blueprint registration
+├── models.py                    # SQLAlchemy models only (no business logic)
 ├── auth.py                      # Authentication system (Flask-Login, decorators)
 ├── quiz_logic.py                # Quiz generation & fact selection
 ├── facts_loader.py              # JSON fact loading & validation
-├── init_database.py             # Database initialization script
-├── migration_add_auth.py        # Migration script for auth system (v3.0)
-├── migration_add_fact_states.py # Migration script for fact states (v2.0)
+├── doom_loop.py                 # Recovery mode for struggling learners
+├── blueprints/                  # Route handlers, one module per concern
+│   ├── admin.py                 # Admin dashboard & teacher management
+│   ├── auth_routes.py           # Login, logout, password setup
+│   ├── teacher.py               # Teacher dashboard, domains, students, groups
+│   ├── student.py               # Student domain selection & progress
+│   ├── quiz.py                  # Learning & quizzing flow
+│   └── analytics.py             # Analytics dashboards
+├── services/                    # Business logic layer
+│   ├── fact_service.py          # Fact learning states & attempts
+│   ├── user_service.py          # User management & authentication
+│   ├── domain_service.py        # Domain assignment & visibility
+│   ├── progress_service.py      # Progress tracking & statistics
+│   ├── image_service.py         # Fact images (markers, uploads, validation)
+│   ├── analytics_service.py     # Data aggregation & insights
+│   ├── group_service.py         # Student groups & bulk assignment
+│   ├── template_service.py      # Assignment templates
+│   ├── streak_service.py        # Practice streaks
+│   └── bulk_import_service.py   # Bulk student import
+├── init_db.py                   # Database initialization script
+├── rebuild_db.py                # Drop and rebuild the database from scratch
+├── verify_database.py           # Read-only database health check
+├── migration_add_*.py           # One-off schema migration scripts
 ├── instance/                    # Flask instance folder (auto-created)
 │   └── database.db              # SQLite database (auto-initialized)
 ├── requirements.txt             # Python dependencies
-├── requirements-dev.txt         # Development dependencies
+├── requirements-dev.txt         # Development dependencies (linters pinned exactly)
 ├── pytest.ini                   # Pytest configuration with coverage
 ├── pyproject.toml               # Black and Ruff configuration
 ├── .flake8                      # Flake8 configuration
@@ -271,15 +294,19 @@ rememberizer/
 ├── facts/                       # JSON fact files directory
 │   ├── greek_muses.json         # Example: 9 Greek muses
 │   └── chinese_dynasties.json   # Example: 14 Chinese dynasties
-├── tests/                       # Comprehensive test suite (162+ tests)
+├── tests/                       # Test suite (269 tests)
 │   ├── README.md                # Testing documentation
-│   ├── __init__.py              # Test package marker
 │   ├── conftest.py              # Shared test fixtures (app, users, domains)
-│   ├── test_auth.py             # Authentication tests (15 tests)
-│   ├── test_authorization.py    # Authorization tests (13 tests)
-│   ├── test_multi_user.py       # Multi-user functionality (20+ tests)
+│   ├── test_auth.py             # Authentication
+│   ├── test_authorization.py    # Role-based access control
+│   ├── test_multi_user.py       # Multi-user isolation
 │   ├── test_models.py           # Database models & learning states
 │   ├── test_quiz_logic.py       # Quiz generation & fact selection
+│   ├── test_image_fields.py     # Fact images (markers, uploads, rendering)
+│   ├── test_domain_creation.py  # Teacher domain creation
+│   ├── test_duplicate_symbols.py# Duplicate field values in options
+│   ├── test_fact_service.py     # Fact learning state transitions
+│   ├── test_streak_service.py   # Practice streaks
 │   ├── test_template_filters.py # Jinja2 filter tests
 │   ├── test_doom_loop.py        # Recovery mode tests
 │   ├── test_facts_loader.py     # JSON loading & validation
@@ -288,20 +315,15 @@ rememberizer/
 │   ├── base.html                # Base template with terminal header
 │   ├── login.html               # Login page
 │   ├── setup_password.html      # Password setup page (magic link)
-│   ├── admin/
-│   │   ├── dashboard.html       # Admin control panel
-│   │   └── create_teacher.html  # Teacher creation form
-│   ├── teacher/
-│   │   ├── dashboard.html       # Student list with progress
-│   │   ├── student_detail.html  # Detailed student view
-│   │   └── create_student.html  # Student creation form
-│   ├── student/
-│   │   ├── domains.html         # Assigned domain selection
-│   │   └── progress.html        # Personal progress overview
+│   ├── admin/                   # Admin dashboard, teacher creation
+│   ├── teacher/                 # Dashboard, domains, students, groups, templates
+│   ├── student/                 # Assigned domains, personal progress
+│   ├── analytics/               # Analytics dashboards
 │   ├── select_domain.html       # Domain selection (legacy)
 │   ├── show_fact.html           # Fact display page
 │   ├── quiz.html                # Quiz question page
-│   └── answer_result.html       # Answer feedback page
+│   ├── answer_result.html       # Answer feedback page
+│   └── celebration.html         # Domain completion screen
 └── static/
     ├── style.css                # Terminal styling (green/red on black)
     ├── app.js                   # Client-side interactivity
@@ -720,24 +742,37 @@ pytest -m models            # Model tests
 
 ### Test Suite Overview
 
-**162+ comprehensive tests** across 10 test files:
+**269 tests** across 14 test files:
 
-1. **test_auth.py** (15 tests): User creation, authentication, login/logout, password setup
-2. **test_authorization.py** (13 tests): Role-based access control, organization isolation
-3. **test_multi_user.py** (20+ tests): Progress isolation, domain assignment, engagement metrics
-4. **test_models.py** (30 tests): Database models, learning states, fact state transitions
-5. **test_quiz_logic.py** (24 tests): Quiz generation, fact selection, spaced repetition
-6. **test_template_filters.py**: Jinja2 filter tests
-7. **test_doom_loop.py**: Recovery mode logic
-8. **test_facts_loader.py** (16 tests): JSON loading and validation
-9. **test_routes.py** (32 tests): Flask routes and quiz flows
-10. **Additional integration tests**: Full workflows (admin→teacher→student→quiz)
+1. **test_routes.py** (43 tests): Flask routes and quiz flows
+2. **test_image_fields.py** (42 tests): Image markers, uploads, resolution, rendering
+3. **test_models.py** (33 tests): Database models, learning states, fact state transitions
+4. **test_quiz_logic.py** (23 tests): Quiz generation, fact selection, spaced repetition
+5. **test_auth.py** (18 tests): User creation, authentication, login/logout, password setup
+6. **test_streak_service.py** (17 tests): Practice streaks and daily goals
+7. **test_multi_user.py** (17 tests): Progress isolation, domain assignment, engagement metrics
+8. **test_authorization.py** (16 tests): Role-based access control, organization isolation
+9. **test_domain_creation.py** (16 tests): Teacher domain creation via form and CSV
+10. **test_facts_loader.py** (16 tests): JSON loading and validation
+11. **test_doom_loop.py** (11 tests): Recovery mode logic
+12. **test_duplicate_symbols.py** (8 tests): Duplicate field values in answer options
+13. **test_template_filters.py** (5 tests): Jinja2 filter tests
+14. **test_fact_service.py** (4 tests): Fact learning state transitions
 
-**Code Coverage:** >90% overall
-- Critical paths (auth, authorization, progress isolation): 100%
-- Models: >95%
-- Routes: >90%
-- Quiz Logic: >95%
+**Code Coverage:** 71% overall
+
+Well covered:
+- models.py: 99% · fact_service: 99% · progress_service: 97% · image_service: 97%
+- facts_loader: 94% · domain_service: 93% · user_service: 92% · quiz_logic: 89%
+
+Gaps worth knowing about — these ship without tests:
+- `services/analytics_service.py`, `services/group_service.py`,
+  `services/template_service.py`, `services/bulk_import_service.py`: **0%**
+- `blueprints/analytics.py`: 27% · `blueprints/teacher.py`: 40% ·
+  `blueprints/admin.py`: 48%
+
+The root utility scripts (`rebuild_db.py`, `verify_database.py`, etc.) are not
+covered by design — they are operator tools, not application code.
 
 ### Test Fixtures
 

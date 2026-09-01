@@ -309,12 +309,54 @@ would succeed and deletes silently no-op, orphaning every file forever. Both now
 - ✅ `facts_loader.py` untouched — bundled `facts/*.json` domains stay text-only,
   by design
 
-### Known CI Issue (pre-existing)
-`main` already fails `black --check .` (18 files) and `flake8 .` (~75 errors) with
-current tool versions — `requirements-dev.txt` pins only `black>=23.0.0`, so CI
-installs whatever is latest and formatting rules have moved. Verified against a clean
-`git archive HEAD` tree: this feature adds **no** new Black or Flake8 findings. Worth a
-separate pass that pins exact versions and clears the backlog.
+---
+
+## 2026-09-01: CI Lint Backlog & Doc Accuracy Pass
+
+### The Problem
+CI was already red on `main`, independent of any feature work: `black --check .` wanted
+to reformat 18 files and `flake8 .` reported 75 errors on a clean checkout.
+
+**Root cause**: `requirements-dev.txt` pinned `black>=23.0.0` and `flake8>=6.1.0`, so CI
+installed whatever was newest at build time. Black's formatting rules changed between
+releases, and a PR that was green at merge went red later with no code change at all.
+
+### Fixes
+
+**1. Pinned the CI gates exactly** — `black==26.5.1`, `flake8==7.3.0`. Bump them
+deliberately, reformatting in the same commit. The other dev deps stay on ranges since
+nothing gates on them.
+
+**2. Applied Black repo-wide** (18 files) — purely mechanical.
+
+**3. Cleared all 75 Flake8 errors.** Not all were mechanical:
+- **F401 kept deliberately**: `rebuild_db.py` imports `FactState`, `Attempt` and
+  `UserDomainAssignment` for their side effect — a model must be registered before
+  `db.create_all()` gives it a table. Marked `# noqa: F401` with a comment rather than
+  removed, which would have silently stopped creating three tables
+- **F401 removed**: genuinely dead imports in `blueprints/quiz.py` (including a
+  `login_required` imported inside `celebrate()` that was never applied — the route
+  hand-rolls its `current_user.is_authenticated` check instead), `analytics.py`,
+  `analytics_service.py`, `template_service.py`, and two test files
+- **E402 kept**: `# noqa: E402` where imports must follow `sys.path.insert()`
+- **E722**: bare `except:` in `rebuild_db.py` → `except Exception:`
+- **F541 / E501**: mechanical (dropped redundant `f` prefixes, wrapped long lines)
+
+### Doc Accuracy
+The project trees in README.md and ARCHITECTURE.md still described the pre-blueprint,
+pre-service layout — "app.py: ALL routes", "models.py: models + business logic", no
+`blueprints/` or `services/` at all. Both are now accurate, along with
+"Separation of Concerns" and "Dependency Flow".
+
+**Coverage claims were false.** README claimed ">90% code coverage"; actual is **71%**.
+Four services are at **0%** — `analytics_service`, `group_service`, `template_service`,
+`bulk_import_service` all shipped untested, and `blueprints/analytics.py` sits at 27%.
+README now states the real number and names the gaps instead of hiding them.
+
+### Result
+- ✅ `black --check .` clean (54 files)
+- ✅ `flake8 .` clean (0 errors)
+- ✅ 269 tests passing
 
 ---
 
@@ -328,10 +370,11 @@ separate pass that pins exact versions and clears the backlog.
 - Session management with Flask-Login
 
 ### Test Coverage
-- 188 tests covering all major functionality
-- 83% code coverage
+- 269 tests, 71% overall coverage (as of 2026-09-01)
 - Tests organized by feature area
 - Fixtures for authenticated users and test data
+- Untested: analytics_service, group_service, template_service,
+  bulk_import_service (all 0%) - shipped without tests, worth backfilling
 
 ### Branch Protection
 - Main branch requires passing CI tests
