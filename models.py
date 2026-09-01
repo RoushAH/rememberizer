@@ -228,9 +228,7 @@ class StudentGroupMembership(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    group_id = db.Column(
-        db.Integer, db.ForeignKey("student_groups.id"), nullable=False
-    )
+    group_id = db.Column(db.Integer, db.ForeignKey("student_groups.id"), nullable=False)
     added_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     __table_args__ = (

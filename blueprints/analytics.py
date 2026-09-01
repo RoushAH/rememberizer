@@ -93,15 +93,19 @@ def api_at_risk():
     # Serialize for JSON
     result = []
     for student in at_risk:
-        result.append({
-            "student_id": student["student_id"],
-            "name": student["name"],
-            "email": student["email"],
-            "reasons": student["reasons"],
-            "last_active": (
-                student["last_active"].isoformat() if student["last_active"] else None
-            ),
-        })
+        result.append(
+            {
+                "student_id": student["student_id"],
+                "name": student["name"],
+                "email": student["email"],
+                "reasons": student["reasons"],
+                "last_active": (
+                    student["last_active"].isoformat()
+                    if student["last_active"]
+                    else None
+                ),
+            }
+        )
 
     return jsonify(result)
 
@@ -169,7 +173,6 @@ def student_analytics(student_id):
     )
     from services.streak_service import get_streak_info
     from datetime import datetime, timedelta
-    from sqlalchemy import func
 
     require_teacher_or_admin()
 
@@ -184,19 +187,19 @@ def student_analytics(student_id):
         progress = get_student_domain_progress(student_id, domain.id)
         if progress:
             progress["is_complete"] = is_domain_complete(student_id, domain.id)
-        domain_progress.append({
-            "domain": domain,
-            "progress": progress,
-        })
+        domain_progress.append(
+            {
+                "domain": domain,
+                "progress": progress,
+            }
+        )
 
     # Get engagement metrics
     questions_today = get_questions_answered_today(student_id)
     total_time = get_total_time_spent(student_id)
     formatted_time = format_time_spent(total_time)
     total_questions = Attempt.query.filter_by(user_id=student_id).count()
-    total_correct = Attempt.query.filter_by(
-        user_id=student_id, correct=True
-    ).count()
+    total_correct = Attempt.query.filter_by(user_id=student_id, correct=True).count()
     accuracy = (total_correct / total_questions * 100) if total_questions > 0 else 0
 
     # Get streak info
@@ -215,10 +218,12 @@ def student_analytics(student_id):
             Attempt.timestamp <= day_end,
         ).count()
 
-        activity_by_day.append({
-            "date": day.strftime("%m/%d"),
-            "count": count,
-        })
+        activity_by_day.append(
+            {
+                "date": day.strftime("%m/%d"),
+                "count": count,
+            }
+        )
 
     return render_template(
         "analytics/student_analytics.html",

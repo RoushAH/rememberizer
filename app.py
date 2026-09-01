@@ -10,10 +10,10 @@ app = Flask(__name__)
 
 # Get absolute path to database in instance folder
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, 'instance', 'database.db')
+DB_PATH = os.path.join(BASE_DIR, "instance", "database.db")
 
 # Ensure instance folder exists
-os.makedirs(os.path.join(BASE_DIR, 'instance'), exist_ok=True)
+os.makedirs(os.path.join(BASE_DIR, "instance"), exist_ok=True)
 
 app.config["SECRET_KEY"] = os.environ.get(
     "SECRET_KEY", "dev-secret-key-change-in-production"
@@ -142,7 +142,9 @@ def init_database():
                 return  # Database is already set up
         except Exception:
             # Table doesn't exist, continue with initialization
-            print(f"Database file exists at {DB_PATH} but tables missing, initializing...")
+            print(
+                f"Database file exists at {DB_PATH} but tables missing, initializing..."
+            )
 
     if _db_initialized:
         return

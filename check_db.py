@@ -1,6 +1,6 @@
 import sqlite3
 
-conn = sqlite3.connect('instance/database.db')
+conn = sqlite3.connect("instance/database.db")
 cursor = conn.cursor()
 
 # Check all objects in database

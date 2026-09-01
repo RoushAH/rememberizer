@@ -1,6 +1,5 @@
 """Tests for duplicate field values in quiz questions (Greek Muses scenario)."""
 
-import pytest
 from models import Fact, Attempt
 from services.fact_service import mark_fact_learned
 from quiz_logic import generate_question
@@ -22,7 +21,8 @@ def test_muses_domain_has_duplicate_symbols(app, muses_domain, erato_and_terpsic
 def test_erato_symbol_quiz_excludes_duplicate(
     app, muses_domain, erato_and_terpsichore, student_user
 ):
-    """Test that quizzing Erato's symbol doesn't include Terpsichore's duplicate 'Lyre' in wrong answers."""
+    """Quizzing Erato's symbol must not offer Terpsichore's duplicate 'Lyre'
+    as a wrong answer."""
     erato, terpsichore = erato_and_terpsichore
 
     with app.app_context():
@@ -31,7 +31,9 @@ def test_erato_symbol_quiz_excludes_duplicate(
 
         # Generate question about Erato's symbol (context=name, quiz=symbol)
         all_facts = Fact.query.filter_by(domain_id=muses_domain.id).all()
-        question_data = generate_question(erato, "name", "symbol", all_facts, muses_domain)
+        question_data = generate_question(
+            erato, "name", "symbol", all_facts, muses_domain
+        )
 
         options = question_data["options"]
         correct_answer = question_data["correct_answer"]
@@ -48,7 +50,8 @@ def test_erato_symbol_quiz_excludes_duplicate(
 def test_terpsichore_symbol_quiz_excludes_duplicate(
     app, muses_domain, erato_and_terpsichore, student_user
 ):
-    """Test that quizzing Terpsichore's symbol doesn't include Erato's duplicate 'Lyre' in wrong answers."""
+    """Quizzing Terpsichore's symbol must not offer Erato's duplicate 'Lyre'
+    as a wrong answer."""
     erato, terpsichore = erato_and_terpsichore
 
     with app.app_context():
@@ -57,7 +60,9 @@ def test_terpsichore_symbol_quiz_excludes_duplicate(
 
         # Generate question about Terpsichore's symbol (context=name, quiz=symbol)
         all_facts = Fact.query.filter_by(domain_id=muses_domain.id).all()
-        question_data = generate_question(terpsichore, "name", "symbol", all_facts, muses_domain)
+        question_data = generate_question(
+            terpsichore, "name", "symbol", all_facts, muses_domain
+        )
 
         options = question_data["options"]
         correct_answer = question_data["correct_answer"]
@@ -158,7 +163,8 @@ def test_both_muses_accept_lyre_as_correct(
 def test_multiple_quiz_generations_no_duplicate_in_options(
     app, muses_domain, erato_and_terpsichore, student_user
 ):
-    """Test generating multiple questions to ensure 'Lyre' never appears as both correct and wrong."""
+    """Across many generated questions, 'Lyre' must never appear as both the
+    correct answer and a wrong one."""
     erato, terpsichore = erato_and_terpsichore
 
     with app.app_context():
@@ -170,15 +176,17 @@ def test_multiple_quiz_generations_no_duplicate_in_options(
         # Generate 20 questions for each muse to test randomization
         for _ in range(20):
             # Test Erato (quiz on symbol field)
-            erato_question = generate_question(erato, "name", "symbol", all_facts, muses_domain)
+            erato_question = generate_question(
+                erato, "name", "symbol", all_facts, muses_domain
+            )
             options = erato_question["options"]
             lyre_count = sum(1 for opt in options if opt == "Lyre")
-            assert (
-                lyre_count == 1
-            ), f"Erato question has {lyre_count} 'Lyre' options"
+            assert lyre_count == 1, f"Erato question has {lyre_count} 'Lyre' options"
 
             # Test Terpsichore (quiz on symbol field)
-            terp_question = generate_question(terpsichore, "name", "symbol", all_facts, muses_domain)
+            terp_question = generate_question(
+                terpsichore, "name", "symbol", all_facts, muses_domain
+            )
             options = terp_question["options"]
             lyre_count = sum(1 for opt in options if opt == "Lyre")
             assert (
@@ -189,7 +197,8 @@ def test_multiple_quiz_generations_no_duplicate_in_options(
 def test_other_muse_fields_unaffected_by_duplicate_symbol(
     app, muses_domain, erato_and_terpsichore, student_user
 ):
-    """Test that duplicate symbols don't affect quizzing on other fields (name, domain)."""
+    """Duplicate symbols must not affect quizzing on other fields (name,
+    domain)."""
     erato, terpsichore = erato_and_terpsichore
 
     with app.app_context():
@@ -199,8 +208,12 @@ def test_other_muse_fields_unaffected_by_duplicate_symbol(
         all_facts = Fact.query.filter_by(domain_id=muses_domain.id).all()
 
         # Generate questions for both muses on different fields
-        erato_question = generate_question(erato, "symbol", "name", all_facts, muses_domain)
-        terp_question = generate_question(terpsichore, "symbol", "domain", all_facts, muses_domain)
+        erato_question = generate_question(
+            erato, "symbol", "name", all_facts, muses_domain
+        )
+        terp_question = generate_question(
+            terpsichore, "symbol", "domain", all_facts, muses_domain
+        )
 
         # Verify questions are valid (have 4 options, correct answer is in options)
         for question in [erato_question, terp_question]:
@@ -212,7 +225,8 @@ def test_other_muse_fields_unaffected_by_duplicate_symbol(
 def test_reverse_direction_erato_accepts_terpsichore(
     authenticated_student, app, muses_domain, erato_and_terpsichore, student_user
 ):
-    """Test reverse direction: Quizzing Erato's name, user selects Terpsichore (should be correct)."""
+    """Reverse direction: quizzing Erato's name, selecting Terpsichore should
+    be accepted as correct."""
     erato, terpsichore = erato_and_terpsichore
 
     with app.app_context():
@@ -220,7 +234,8 @@ def test_reverse_direction_erato_accepts_terpsichore(
         erato_id = erato.id
         domain_id = muses_domain.id
 
-    # Try multiple times to get a question where both Erato and Terpsichore are in the options
+    # Try multiple times to get a question where both Erato and Terpsichore
+    # are in the options
     max_attempts = 50
     found_valid_question = False
 
@@ -269,9 +284,10 @@ def test_reverse_direction_erato_accepts_terpsichore(
                         ), "Terpsichore should be accepted as correct for symbol='Lyre'"
                     break
 
-    assert (
-        found_valid_question
-    ), "Could not generate a question with both Erato and Terpsichore in options after 50 attempts"
+    assert found_valid_question, (
+        "Could not generate a question with both Erato and Terpsichore in "
+        "options after 50 attempts"
+    )
 
 
 def test_reverse_direction_wrong_answer_still_wrong(

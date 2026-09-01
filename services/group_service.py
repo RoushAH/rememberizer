@@ -289,17 +289,21 @@ def get_group_progress_summary(group_id):
         for domain in assigned_domains:
             progress_str = get_progress_string(domain.id, student.id)
             is_complete = is_domain_complete(student.id, domain.id)
-            domain_progress.append({
-                "domain": domain,
-                "progress": progress_str,
-                "is_complete": is_complete,
-            })
+            domain_progress.append(
+                {
+                    "domain": domain,
+                    "progress": progress_str,
+                    "is_complete": is_complete,
+                }
+            )
 
-        progress_data.append({
-            "student": student,
-            "domain_progress": domain_progress,
-            "questions_today": questions_today,
-            "total_questions": total_questions,
-        })
+        progress_data.append(
+            {
+                "student": student,
+                "domain_progress": domain_progress,
+                "questions_today": questions_today,
+                "total_questions": total_questions,
+            }
+        )
 
     return progress_data

@@ -7,21 +7,23 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+
 def run_in_separate_process(code):
     """Run Python code in a completely separate process."""
     result = subprocess.run(
         ["python", "-c", code],
         cwd=os.path.dirname(os.path.abspath(__file__)),
         capture_output=True,
-        text=True
+        text=True,
     )
     return result.stdout, result.returncode
 
+
 def test_persistence():
     """Test that data persists across separate Python processes."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("PERSISTENCE TEST")
-    print("="*60)
+    print("=" * 60)
 
     # Step 0: Clean up any existing test user
     print("\n0. Cleanup: Removing any existing test user...")
@@ -74,7 +76,7 @@ with app.app_context():
             ["python", "-c", code1],
             cwd=os.path.dirname(os.path.abspath(__file__)),
             capture_output=True,
-            text=True
+            text=True,
         )
         print("   Error output:", result.stderr)
         return False
@@ -126,7 +128,7 @@ with app.app_context():
             ["python", "-c", code3],
             cwd=os.path.dirname(os.path.abspath(__file__)),
             capture_output=True,
-            text=True
+            text=True,
         )
         print("   Error output:", result.stderr)
         return False
@@ -190,9 +192,9 @@ with app.app_context():
         print("   [FAILED] Deletion did not persist")
         return False
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("[SUCCESS] All persistence tests passed!")
-    print("="*60)
+    print("=" * 60)
     print("\nDatabase is working correctly:")
     print("  - Data persists across separate Python processes")
     print("  - Create, Read, Update, Delete operations all work")
@@ -200,6 +202,7 @@ with app.app_context():
     print()
 
     return True
+
 
 if __name__ == "__main__":
     success = test_persistence()

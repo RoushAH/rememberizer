@@ -552,10 +552,12 @@ def groups():
     group_data = []
     for group in all_groups:
         students = get_students_in_group(group.id)
-        group_data.append({
-            "group": group,
-            "student_count": len(students),
-        })
+        group_data.append(
+            {
+                "group": group,
+                "student_count": len(students),
+            }
+        )
 
     return render_template("teacher/groups.html", group_data=group_data)
 
@@ -857,7 +859,9 @@ def download_sample_csv():
     return Response(
         csv_content,
         mimetype="text/csv",
-        headers={"Content-Disposition": "attachment;filename=student_import_template.csv"},
+        headers={
+            "Content-Disposition": "attachment;filename=student_import_template.csv"
+        },
     )
 
 
@@ -888,11 +892,13 @@ def templates():
     template_data = []
     for template in all_templates:
         domains = get_template_domains(template.id)
-        template_data.append({
-            "template": template,
-            "domains": domains,
-            "domain_count": len(domains),
-        })
+        template_data.append(
+            {
+                "template": template,
+                "domains": domains,
+                "domain_count": len(domains),
+            }
+        )
 
     return render_template("teacher/templates.html", template_data=template_data)
 

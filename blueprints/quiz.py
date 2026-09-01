@@ -2,7 +2,7 @@
 
 from flask import Blueprint, render_template, request, redirect, url_for, session
 from flask_login import current_user
-from models import Domain, Fact, FactState
+from models import Domain, Fact
 from services.fact_service import (
     mark_fact_learned,
     mark_fact_shown,
@@ -12,7 +12,6 @@ from services.fact_service import (
     update_consecutive_attempts,
     get_learned_facts,
     get_out_of_order_facts,
-    get_attempt_count,
 )
 from services.domain_service import (
     is_domain_assigned,
@@ -422,7 +421,8 @@ def answer():
     is_correct = selected_answer == correct_answer
 
     # If not correct, check for "multiple correct answers" scenario
-    # This happens when the question asks "Which X has Y=value?" and multiple Xs have that value
+    # This happens when the question asks "Which X has Y=value?" and multiple
+    # Xs have that value
     if not is_correct:
         context_field_name = session.get("context_field")
 
@@ -438,11 +438,13 @@ def answer():
                 # Find all facts in domain
                 all_facts = Fact.query.filter_by(domain_id=domain_id).all()
 
-                # Check if selected answer matches another fact with the same context value
+                # Check if selected answer matches another fact with the same
+                # context value
                 for other_fact in all_facts:
                     other_data = other_fact.get_fact_data()
 
-                    # If another fact has the same context value AND the selected answer matches its quiz field
+                    # If another fact has the same context value AND the selected
+                    # answer matches its quiz field
                     if (
                         other_data.get(context_field_name) == context_value
                         and other_data.get(field_name) == selected_answer
@@ -603,8 +605,6 @@ def reset():
 @quiz_bp.route("/celebrate/<int:domain_id>")
 def celebrate(domain_id):
     """Display celebration screen for completing a domain."""
-    from flask_login import login_required
-
     # Require authentication
     if not current_user.is_authenticated:
         return redirect(url_for("auth.login"))
