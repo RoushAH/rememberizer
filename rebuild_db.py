@@ -8,13 +8,16 @@ import time
 # Add project directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance', 'database.db')
+DB_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "instance", "database.db"
+)
+
 
 def rebuild_database():
     """Delete and rebuild database from scratch."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("DATABASE REBUILD FROM SCRATCH")
-    print("="*60)
+    print("=" * 60)
 
     # Step 1: Check if database exists
     if os.path.exists(DB_PATH):
@@ -28,7 +31,8 @@ def rebuild_database():
             conn = sqlite3.connect(DB_PATH)
             conn.close()
             time.sleep(0.5)  # Give OS time to release file
-        except:
+        except Exception:
+            # Best effort only - the delete below reports the real failure
             pass
 
         # Delete the file
@@ -38,7 +42,9 @@ def rebuild_database():
             print("   [OK] Database file deleted")
         except Exception as e:
             print(f"   [ERROR] Could not delete database: {e}")
-            print("\n   Please close any programs that might be accessing the database:")
+            print(
+                "\n   Please close any programs that might be accessing the database:"
+            )
             print("   - Flask development server")
             print("   - DB Browser for SQLite")
             print("   - Python shells/scripts")
@@ -50,7 +56,18 @@ def rebuild_database():
     print("\n4. Creating fresh database...")
 
     from app import app, db
-    from models import Domain, Fact, User, Organization, FactState, Attempt, UserDomainAssignment
+
+    # FactState, Attempt and UserDomainAssignment are imported for their side
+    # effect: every model must be registered before db.create_all() to get a table.
+    from models import (  # noqa: F401
+        Domain,
+        Fact,
+        User,
+        Organization,
+        FactState,
+        Attempt,
+        UserDomainAssignment,
+    )
     from facts_loader import load_all_domains_from_directory
 
     with app.app_context():
@@ -76,9 +93,9 @@ def rebuild_database():
         print(f"   - Facts: {Fact.query.count()}")
         print(f"   - Users: {User.query.count()}")
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("[SUCCESS] Database rebuilt successfully!")
-    print("="*60)
+    print("=" * 60)
     print("\nYou can now:")
     print("1. Run the app: python app.py")
     print("2. Create an admin account when prompted")
@@ -86,6 +103,7 @@ def rebuild_database():
     print()
 
     return True
+
 
 if __name__ == "__main__":
     success = rebuild_database()

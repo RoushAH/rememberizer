@@ -2,6 +2,9 @@
 database.db
 *.db
 
+# Teacher-uploaded fact images
+static/uploads/
+
 # Python
 __pycache__/
 *.py[cod]

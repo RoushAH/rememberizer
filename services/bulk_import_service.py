@@ -80,11 +80,13 @@ def parse_csv_content(csv_content):
             if row_errors:
                 errors.append(f"Row {row_num}: {'; '.join(row_errors)}")
             else:
-                students.append({
-                    "first_name": first_name,
-                    "last_name": last_name,
-                    "email": email,
-                })
+                students.append(
+                    {
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "email": email,
+                    }
+                )
 
     except csv.Error as e:
         return [], [f"CSV parsing error: {str(e)}"]
@@ -92,9 +94,7 @@ def parse_csv_content(csv_content):
     return students, errors
 
 
-def bulk_import_students(
-    csv_content, organization_id, created_by_id, group_id=None
-):
+def bulk_import_students(csv_content, organization_id, created_by_id, group_id=None):
     """
     Import students from CSV content.
 
@@ -154,9 +154,7 @@ def bulk_import_students(
                     f"{student_data['email']}: skipped (email already exists)"
                 )
             else:
-                import_errors.append(
-                    f"{student_data['email']}: {error_msg}"
-                )
+                import_errors.append(f"{student_data['email']}: {error_msg}")
 
     return {
         "created": created_count,

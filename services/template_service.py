@@ -2,7 +2,7 @@
 
 import json
 from models import db, Domain, AssignmentTemplate
-from services.group_service import get_students_in_group, bulk_assign_domain_to_group
+from services.group_service import bulk_assign_domain_to_group
 
 
 def create_template(name, domain_ids, organization_id, created_by_id):
@@ -143,11 +143,13 @@ def apply_template_to_group(template_id, group_id, assigned_by_id):
 
         result = bulk_assign_domain_to_group(group_id, domain_id, assigned_by_id)
 
-        results["domains"].append({
-            "domain_name": domain.name,
-            "assigned": result["assigned"],
-            "skipped": result["skipped"],
-        })
+        results["domains"].append(
+            {
+                "domain_name": domain.name,
+                "assigned": result["assigned"],
+                "skipped": result["skipped"],
+            }
+        )
         results["total_assigned"] += result["assigned"]
         results["total_skipped"] += result["skipped"]
 
@@ -192,16 +194,20 @@ def apply_template_to_student(template_id, student_id, assigned_by_id):
         try:
             assign_domain_to_user(student_id, domain_id, assigned_by_id)
             results["assigned"] += 1
-            results["domains"].append({
-                "domain_name": domain.name,
-                "status": "assigned",
-            })
+            results["domains"].append(
+                {
+                    "domain_name": domain.name,
+                    "status": "assigned",
+                }
+            )
         except ValueError:
             results["skipped"] += 1
-            results["domains"].append({
-                "domain_name": domain.name,
-                "status": "already assigned",
-            })
+            results["domains"].append(
+                {
+                    "domain_name": domain.name,
+                    "status": "already assigned",
+                }
+            )
 
     return results
 

@@ -918,40 +918,60 @@ else:
 
 ```
 rememberizer/
-├── app.py                  # Main application (routes, config, startup)
-├── models.py               # Database models + business logic
+├── app.py                  # Flask app: config, template filters, blueprint registration
+├── models.py               # SQLAlchemy models only
 ├── auth.py                 # Authentication (Flask-Login, decorators)
 ├── quiz_logic.py           # Quiz generation (question/fact selection)
 ├── facts_loader.py         # JSON fact loading + validation
-├── init_database.py        # Database initialization script
-├── migration_*.py          # Database migration scripts
+├── doom_loop.py            # Recovery mode
+├── blueprints/             # Route handlers
+│   ├── admin.py
+│   ├── auth_routes.py
+│   ├── teacher.py
+│   ├── student.py
+│   ├── quiz.py
+│   └── analytics.py
+├── services/               # Business logic layer
+│   ├── fact_service.py
+│   ├── user_service.py
+│   ├── domain_service.py
+│   ├── progress_service.py
+│   ├── image_service.py    # Fact images (markers, uploads, validation)
+│   ├── analytics_service.py
+│   ├── group_service.py
+│   ├── template_service.py
+│   ├── streak_service.py
+│   └── bulk_import_service.py
+├── init_db.py              # Database initialization script
+├── migration_add_*.py      # Database migration scripts
 ├── templates/              # Jinja2 templates (HTML)
 │   ├── base.html           # Base template (header, nav, logout)
 │   ├── login.html
 │   ├── setup_password.html
 │   ├── admin/              # Admin templates
-│   │   ├── dashboard.html
-│   │   └── create_teacher.html
 │   ├── teacher/            # Teacher templates
-│   │   ├── dashboard.html
-│   │   ├── student_detail.html
-│   │   └── create_student.html
 │   ├── student/            # Student templates
-│   │   ├── domains.html
-│   │   └── progress.html
+│   ├── analytics/          # Analytics templates
 │   ├── quiz.html           # Quiz question page
 │   ├── show_fact.html      # Fact display page
-│   └── answer_result.html  # Answer feedback page
+│   ├── answer_result.html  # Answer feedback page
+│   └── celebration.html    # Domain completion screen
 ├── static/                 # Static assets
 │   ├── style.css           # Terminal-style CSS
-│   └── app.js              # Client-side JavaScript
-└── tests/                  # Test suite (162+ tests)
+│   ├── app.js              # Client-side JavaScript
+│   └── uploads/            # Teacher-uploaded fact images (gitignored)
+└── tests/                  # Test suite (269 tests)
     ├── conftest.py         # Pytest fixtures
     ├── test_auth.py
     ├── test_authorization.py
     ├── test_multi_user.py
     ├── test_models.py
     ├── test_quiz_logic.py
+    ├── test_image_fields.py
+    ├── test_domain_creation.py
+    ├── test_duplicate_symbols.py
+    ├── test_fact_service.py
+    ├── test_streak_service.py
     ├── test_template_filters.py
     ├── test_doom_loop.py
     ├── test_facts_loader.py
@@ -960,24 +980,35 @@ rememberizer/
 
 ### Separation of Concerns
 
-**app.py (Routes & Request Handling):**
+**app.py (Application Setup):**
 - Flask app configuration
-- Route definitions
+- Database initialization
+- Jinja template filters, tests and globals
+- Error handlers
+- Blueprint registration
+- **NO routes** (they live in blueprints/) and **NO business logic**
+
+**blueprints/*.py (Routes & Request Handling):**
+- Route definitions, one module per concern
 - Request/response handling
 - Session management
 - Template rendering
-- Flash messages
-- Redirects
-- **NO business logic** (delegates to models.py, quiz_logic.py)
+- Flash messages and redirects
+- **NO business logic** (delegates to services/, quiz_logic.py)
 
-**models.py (Business Logic & Data Access):**
-- Database model definitions (SQLAlchemy)
+**models.py (Data Definitions):**
+- Database model definitions (SQLAlchemy) and nothing else
+- **NO Flask dependencies**, **NO queries, NO business logic**
+
+**services/*.py (Business Logic & Data Access):**
 - All database queries
 - State management functions
 - User creation/authentication
-- Progress tracking
-- Engagement metrics
-- **NO Flask dependencies** (pure Python + SQLAlchemy)
+- Progress tracking and engagement metrics
+- Fact image handling (`image_service.py` is the one exception to the
+  no-Flask rule: it needs `current_app` for the upload path and `url_for`
+  to build image URLs)
+- **NO Flask dependencies** elsewhere (pure Python + SQLAlchemy)
 
 **auth.py (Authentication & Authorization):**
 - Flask-Login configuration
@@ -993,7 +1024,6 @@ rememberizer/
 - Fact selection algorithms
 - Wrong answer generation
 - Option shuffling
-- **NO database access** (receives data from models.py)
 - **NO Flask dependencies** (pure Python functions)
 
 **facts_loader.py (Data Loading):**
@@ -1006,10 +1036,18 @@ rememberizer/
 
 ```
 app.py
-  ├─► auth.py (authentication decorators)
-  ├─► models.py (database queries)
-  ├─► quiz_logic.py (question generation)
+  ├─► blueprints/* (route registration)
+  ├─► services/image_service.py (Jinja filter/test/global)
   └─► facts_loader.py (startup only)
+
+blueprints/*
+  ├─► auth.py (authentication decorators)
+  ├─► services/* (business logic)
+  ├─► quiz_logic.py (question generation)
+  └─► models.py (model classes for queries)
+
+services/*
+  └─► models.py (SQLAlchemy models)
 
 models.py
   └─► db (SQLAlchemy, no other dependencies)
@@ -1019,7 +1057,10 @@ auth.py
   └─► models.py (User model)
 
 quiz_logic.py
-  └─► random (no other dependencies)
+  ├─► models.py (Fact, Domain queries)
+  ├─► services/fact_service.py (learning state)
+  ├─► services/image_service.py (image marker detection)
+  └─► random
 
 facts_loader.py
   ├─► models.py (Domain, Fact models)
@@ -1552,6 +1593,42 @@ def get_learned_facts(domain_id, user_id):
 
 ---
 
+### 9. Inline Image Markers (vs. Typed Image Fields)
+
+**Decision**: An image is a fact field *value* prefixed with `img:`, not a field with a
+declared type.
+
+```python
+{"name": "Erato", "symbol": "Lyre", "portrait": "img:uploads/a3f9c1e8.png"}
+```
+
+**Rationale:**
+- **No migration**: `Domain.field_names` stays a JSON list of plain strings. A typed
+  field system would need a new column or table plus a migration of existing domains
+- **No consumer changes**: `field_names` has ~10 consumers (templates, quiz logic,
+  progress display); none needed touching
+- **Grading unchanged**: `options` and `session["correct_answer"]` hold the raw marker
+  strings, so the existing string comparison in `/answer` works as-is
+- **Mixed domains for free**: a field can be an image in one fact and text in another
+
+**Trade-offs:**
+- **No alt text**: there is nowhere in the value to store a real description, so alt
+  text is derived from the field name and subject. A genuine accessibility cost
+- **Marker collision**: a literal text value starting with `img:` would be misread as
+  an image. Acceptable given the fact domains in use
+- **No metadata**: no width, height, or caption without changing the convention
+
+**Alternative considered**: a `field_types` map alongside `field_names`
+(`{"portrait": "image"}`). Rejected as the migration and consumer churn bought nothing
+this feature needed.
+
+**Implementation**: `services/image_service.py` owns the convention — marker parsing,
+upload validation and storage, and reference resolution. Templates reach it through
+three Jinja hooks registered in `app.py`: the `image_value` test, the `image_src`
+filter, and the `learn_card_alt` global.
+
+---
+
 ## Performance Considerations
 
 ### Database Indexes
@@ -1739,6 +1816,11 @@ students = User.query.options(
 
 **Result**: Fully extensible fact schema with zero code changes.
 
+**Image-valued fields**: a field holds an image when its value carries the `img:`
+marker (see "Inline Image Markers" under Design Decisions). This is available in
+teacher-created domains only — `facts_loader.py` validation is unchanged, so bundled
+`facts/*.json` domains stay text-only.
+
 ### Adding New Authentication Providers
 
 **Example**: Add Google OAuth login.
@@ -1887,6 +1969,7 @@ This architecture balances:
 - **Security**: Industry-standard authentication, authorization, and password handling
 - **Scalability**: Supports ~1,000 users out-of-box, scales to 10,000+ with PostgreSQL
 - **Extensibility**: Clean separation of concerns, easy to add features
-- **Testability**: 162+ tests with >90% coverage
+- **Testability**: 269 tests, 71% overall coverage (see README for the uncovered
+  services)
 
 **Design philosophy**: Start simple, scale when needed. Avoid premature optimization. Prioritize clarity over cleverness.

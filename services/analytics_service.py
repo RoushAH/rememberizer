@@ -8,7 +8,6 @@ from models import (
     Domain,
     Fact,
     Attempt,
-    FactState,
     DailyProgress,
     UserDomainAssignment,
 )
@@ -185,13 +184,15 @@ def get_domain_difficulty_comparison(org_id):
         if total_possible_mastery > 0:
             mastery_rate = (total_mastered / total_possible_mastery) * 100
             avg_attempts = total_attempts / total_possible_mastery
-            results.append({
-                "domain_name": domain.name,
-                "domain_id": domain.id,
-                "mastery_rate": round(mastery_rate, 1),
-                "avg_attempts": round(avg_attempts, 1),
-                "total_facts": len(facts),
-            })
+            results.append(
+                {
+                    "domain_name": domain.name,
+                    "domain_id": domain.id,
+                    "mastery_rate": round(mastery_rate, 1),
+                    "avg_attempts": round(avg_attempts, 1),
+                    "total_facts": len(facts),
+                }
+            )
 
     # Sort by mastery rate (lowest first = most difficult)
     results.sort(key=lambda x: x["mastery_rate"])
@@ -265,14 +266,16 @@ def get_at_risk_students(org_id, inactive_days=7, decline_threshold=0.5):
                     risk_reasons.append("declining")
 
         if risk_reasons:
-            at_risk.append({
-                "student": student,
-                "student_id": student.id,
-                "name": student.get_full_name(),
-                "email": student.email,
-                "reasons": risk_reasons,
-                "last_active": student.last_active,
-            })
+            at_risk.append(
+                {
+                    "student": student,
+                    "student_id": student.id,
+                    "name": student.get_full_name(),
+                    "email": student.email,
+                    "reasons": risk_reasons,
+                    "last_active": student.last_active,
+                }
+            )
 
     return at_risk
 
@@ -326,13 +329,15 @@ def get_class_completion_rates(org_id):
 
         if students_with_domain > 0:
             completion_rate = (completed_count / students_with_domain) * 100
-            results.append({
-                "domain_name": domain.name,
-                "domain_id": domain.id,
-                "completion_rate": round(completion_rate, 1),
-                "completed_count": completed_count,
-                "total_students": students_with_domain,
-            })
+            results.append(
+                {
+                    "domain_name": domain.name,
+                    "domain_id": domain.id,
+                    "completion_rate": round(completion_rate, 1),
+                    "completed_count": completed_count,
+                    "total_students": students_with_domain,
+                }
+            )
 
     # Sort by completion rate
     results.sort(key=lambda x: x["completion_rate"], reverse=True)
@@ -405,29 +410,37 @@ def get_class_summary_stats(org_id):
     student_ids = [s.id for s in students]
 
     # Total questions answered
-    total_questions = Attempt.query.filter(
-        Attempt.user_id.in_(student_ids)
-    ).count() if student_ids else 0
+    total_questions = (
+        Attempt.query.filter(Attempt.user_id.in_(student_ids)).count()
+        if student_ids
+        else 0
+    )
 
     # Total correct
-    total_correct = Attempt.query.filter(
-        Attempt.user_id.in_(student_ids), Attempt.correct == True  # noqa: E712
-    ).count() if student_ids else 0
+    total_correct = (
+        Attempt.query.filter(
+            Attempt.user_id.in_(student_ids), Attempt.correct == True  # noqa: E712
+        ).count()
+        if student_ids
+        else 0
+    )
 
     # Questions today
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    questions_today = Attempt.query.filter(
-        Attempt.user_id.in_(student_ids), Attempt.timestamp >= today_start
-    ).count() if student_ids else 0
+    questions_today = (
+        Attempt.query.filter(
+            Attempt.user_id.in_(student_ids), Attempt.timestamp >= today_start
+        ).count()
+        if student_ids
+        else 0
+    )
 
     # Active today (students who answered at least 1 question)
     active_today = 0
     if student_ids:
         active_today = (
             db.session.query(Attempt.user_id)
-            .filter(
-                Attempt.user_id.in_(student_ids), Attempt.timestamp >= today_start
-            )
+            .filter(Attempt.user_id.in_(student_ids), Attempt.timestamp >= today_start)
             .distinct()
             .count()
         )
@@ -462,37 +475,37 @@ def export_student_progress_csv(org_id):
     writer = csv.writer(output)
 
     # Header
-    writer.writerow([
-        "Student Name",
-        "Email",
-        "Total Questions",
-        "Correct Answers",
-        "Accuracy %",
-        "Domains Assigned",
-        "Domains Completed",
-        "Last Active",
-        "Current Streak",
-    ])
+    writer.writerow(
+        [
+            "Student Name",
+            "Email",
+            "Total Questions",
+            "Correct Answers",
+            "Accuracy %",
+            "Domains Assigned",
+            "Domains Completed",
+            "Last Active",
+            "Current Streak",
+        ]
+    )
 
-    students = User.query.filter_by(
-        organization_id=org_id, role="student", is_active=True
-    ).order_by(User.last_name, User.first_name).all()
+    students = (
+        User.query.filter_by(organization_id=org_id, role="student", is_active=True)
+        .order_by(User.last_name, User.first_name)
+        .all()
+    )
 
     for student in students:
         # Total questions and correct
         total = Attempt.query.filter_by(user_id=student.id).count()
-        correct = Attempt.query.filter_by(
-            user_id=student.id, correct=True
-        ).count()
+        correct = Attempt.query.filter_by(user_id=student.id, correct=True).count()
         accuracy = (correct / total * 100) if total > 0 else 0
 
         # Domains
         assignments = UserDomainAssignment.query.filter_by(user_id=student.id).all()
         domains_assigned = len(assignments)
         domains_completed = sum(
-            1
-            for a in assignments
-            if is_domain_complete(student.id, a.domain_id)
+            1 for a in assignments if is_domain_complete(student.id, a.domain_id)
         )
 
         # Last active
@@ -502,22 +515,26 @@ def export_student_progress_csv(org_id):
             else "Never"
         )
 
-        writer.writerow([
-            student.get_full_name(),
-            student.email,
-            total,
-            correct,
-            f"{accuracy:.1f}",
-            domains_assigned,
-            domains_completed,
-            last_active,
-            student.current_streak,
-        ])
+        writer.writerow(
+            [
+                student.get_full_name(),
+                student.email,
+                total,
+                correct,
+                f"{accuracy:.1f}",
+                domains_assigned,
+                domains_completed,
+                last_active,
+                student.current_streak,
+            ]
+        )
 
     return output.getvalue()
 
 
-def update_daily_progress(user_id, questions_answered=0, questions_correct=0, facts_mastered=0):
+def update_daily_progress(
+    user_id, questions_answered=0, questions_correct=0, facts_mastered=0
+):
     """
     Update or create daily progress record for a user.
 

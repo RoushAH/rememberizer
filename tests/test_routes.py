@@ -1073,7 +1073,9 @@ def test_start_prioritizes_out_of_order_facts(
     with app.app_context():
         from services.fact_service import mark_fact_learned
 
-        facts = Fact.query.filter_by(domain_id=assigned_domain.id).order_by(Fact.id).all()
+        facts = (
+            Fact.query.filter_by(domain_id=assigned_domain.id).order_by(Fact.id).all()
+        )
         fact_id_1 = facts[1].id
         fact_id_2 = facts[2].id
 
@@ -1094,9 +1096,6 @@ def test_start_shows_new_facts_when_no_out_of_order(
     authenticated_student, app, assigned_domain, student_user
 ):
     """Test that /start shows new facts when no out-of-order facts exist."""
-    with app.app_context():
-        facts = Fact.query.filter_by(domain_id=assigned_domain.id).all()
-
     # POST to /start (no facts have been shown yet)
     response = authenticated_student.post(
         "/start", data={"domain_id": assigned_domain.id}, follow_redirects=False
@@ -1114,7 +1113,9 @@ def test_show_fact_displays_out_of_order_warning(
     with app.app_context():
         from services.fact_service import mark_fact_learned
 
-        facts = Fact.query.filter_by(domain_id=assigned_domain.id).order_by(Fact.id).all()
+        facts = (
+            Fact.query.filter_by(domain_id=assigned_domain.id).order_by(Fact.id).all()
+        )
         fact_id_1 = facts[1].id
 
         # Learn facts 0 and 2, creating gap at fact 1
@@ -1161,7 +1162,9 @@ def test_show_fact_no_warning_for_new_facts(
 ):
     """Test that brand new facts (shown for first time) don't show warning."""
     with app.app_context():
-        facts = Fact.query.filter_by(domain_id=assigned_domain.id).order_by(Fact.id).all()
+        facts = (
+            Fact.query.filter_by(domain_id=assigned_domain.id).order_by(Fact.id).all()
+        )
         fact_id = facts[0].id
 
     with authenticated_student.session_transaction() as sess:
@@ -1181,7 +1184,9 @@ def test_out_of_order_clears_after_learning(
     with app.app_context():
         from services.fact_service import mark_fact_learned
 
-        facts = Fact.query.filter_by(domain_id=assigned_domain.id).order_by(Fact.id).all()
+        facts = (
+            Fact.query.filter_by(domain_id=assigned_domain.id).order_by(Fact.id).all()
+        )
         fact_id_1 = facts[1].id
 
         # Learn facts 0 and 2, creating gap at fact 1

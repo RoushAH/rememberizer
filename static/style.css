@@ -880,3 +880,32 @@ input[type="file"].form-input::file-selector-button:hover {
     background-color: #00FF00;
     color: #000000;
 }
+
+/* Fact Images */
+.fact-image {
+    display: block;
+    max-width: 100%;
+    max-height: 220px;
+    border: 1px solid #00FF00;
+    image-rendering: auto;
+}
+
+.question-image {
+    display: block;
+    max-width: 100%;
+    max-height: 260px;
+    border: 2px solid #00FF00;
+    margin: 15px auto 0;
+}
+
+.option-image {
+    max-width: 100%;
+    max-height: 140px;
+    border: 1px solid #00FF00;
+    vertical-align: middle;
+}
+
+/* Give image options room to breathe without stretching text options */
+.option-button:has(.option-image) {
+    padding: 10px;
+}

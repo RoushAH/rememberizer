@@ -5,8 +5,18 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from app import app, db, DB_PATH
-from models import Domain, Fact, User, Organization, FactState, Attempt, UserDomainAssignment
+# E402: these have to follow the sys.path setup above to import at all
+from app import app, db, DB_PATH  # noqa: E402
+from models import (  # noqa: E402
+    Domain,
+    Fact,
+    User,
+    Organization,
+    FactState,
+    Attempt,
+    UserDomainAssignment,
+)
+
 
 def force_init():
     """Force initialize database with error checking."""
@@ -44,8 +54,10 @@ def force_init():
         except Exception as e:
             print(f"\n[ERROR] Error during initialization: {e}")
             import traceback
+
             traceback.print_exc()
             return False
+
 
 if __name__ == "__main__":
     success = force_init()

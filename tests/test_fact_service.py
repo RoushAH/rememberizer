@@ -1,9 +1,7 @@
 """Tests for fact service functions."""
 
-import pytest
-from models import db, Fact
+from models import Fact
 from services.fact_service import (
-    mark_fact_shown,
     mark_fact_learned,
     get_out_of_order_facts,
 )

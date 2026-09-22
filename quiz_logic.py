@@ -10,6 +10,7 @@ from services.fact_service import (
     get_learned_facts,
     is_fact_learned,
 )
+from services.image_service import is_image_value
 
 
 def select_next_fact(domain_id, question_count, user_id):
@@ -304,7 +305,8 @@ def generate_question(fact, context_field, quiz_field, all_facts, domain):
         domain: Domain object
 
     Returns:
-        dict: Question data with question, options, correct_index, correct_answer
+        dict: Question data with question, options, correct_index, correct_answer,
+            context_image (the context field's image value, or None)
     """
     fact_data = fact.get_fact_data()
     context_value = fact_data[context_field]
@@ -321,26 +323,44 @@ def generate_question(fact, context_field, quiz_field, all_facts, domain):
     is_plural = is_plural_field(quiz_field)
     what_verb = "What are" if is_plural else "What is"
 
+    domain_name = domain.name if hasattr(domain, "name") else "item"
+    domain_singular = singularize_domain_name(domain_name).lower()
+
+    # An image can't be interpolated into the question text, so when the
+    # context is an image the sentence points at it ("...this portrait?") and
+    # the image is returned alongside for the template to render.
+    context_is_image = is_image_value(context_value)
+
     # Generate question text based on which fields are being used
     if context_field == identifying_field:
-        # Context is name: "What is the symbol of Erato?"
-        # or "What are the years of Han Dynasty?"
-        question = f"{what_verb} the {formatted_quiz_field} of {context_value}?"
+        if context_is_image:
+            # "What is the symbol of this greek muse?"
+            question = (
+                f"{what_verb} the {formatted_quiz_field} of this {domain_singular}?"
+            )
+        else:
+            # Context is name: "What is the symbol of Erato?"
+            # or "What are the years of Han Dynasty?"
+            question = f"{what_verb} the {formatted_quiz_field} of {context_value}?"
     elif quiz_field == identifying_field:
-        # Quiz is name: "Which muse has Lyre as their symbol?"
-        domain_name = domain.name if hasattr(domain, "name") else "item"
-        domain_singular = singularize_domain_name(domain_name).lower()
-        question = (
-            f"Which {domain_singular} has {context_value} "
-            f"as their {formatted_context_field}?"
-        )
+        if context_is_image:
+            # "Which greek muse has this portrait?"
+            question = f"Which {domain_singular} has this {formatted_context_field}?"
+        else:
+            # Quiz is name: "Which muse has Lyre as their symbol?"
+            question = (
+                f"Which {domain_singular} has {context_value} "
+                f"as their {formatted_context_field}?"
+            )
     else:
         # Neither is name: "What is domain of Greek Muse with symbol=Lyre?"
-        domain_name = domain.name if hasattr(domain, "name") else "item"
-        domain_singular = singularize_domain_name(domain_name).lower()
-
-        # Handle "None" values specially
-        if context_value == "None":
+        if context_is_image:
+            question = (
+                f"{what_verb} the {formatted_quiz_field} of the {domain_singular} "
+                f"with this {formatted_context_field}?"
+            )
+        elif context_value == "None":
+            # Handle "None" values specially
             question = (
                 f"{what_verb} the {formatted_quiz_field} of the {domain_singular} "
                 f"without a {formatted_context_field}?"
@@ -362,6 +382,8 @@ def generate_question(fact, context_field, quiz_field, all_facts, domain):
                     wrong_answers.append(answer)
 
     # Handle case with fewer than 3 wrong answers
+    # For an image answer these text placeholders make a mixed grid, so
+    # _choose_field_pair() avoids such fields where it can.
     if len(wrong_answers) < 3:
         while len(wrong_answers) < 3:
             placeholder = f"Option {len(wrong_answers) + 1}"
@@ -382,7 +404,71 @@ def generate_question(fact, context_field, quiz_field, all_facts, domain):
         "options": options,
         "correct_index": correct_index,
         "correct_answer": correct_answer,
+        "context_image": context_value if context_is_image else None,
     }
+
+
+def has_enough_image_distractors(fact, quiz_field, all_facts):
+    """
+    Check whether an image-valued quiz field can fill an all-image option grid.
+
+    Text fields always pass; only an image answer needs 3 other distinct images
+    to avoid falling back to text placeholders.
+
+    Args:
+        fact: Fact object being quizzed
+        quiz_field: Field that would be the answer
+        all_facts: List of all Fact objects in the domain
+
+    Returns:
+        bool: True if the field is safe to quiz
+    """
+    correct_answer = fact.get_fact_data().get(quiz_field)
+    if not is_image_value(correct_answer):
+        return True
+
+    distractors = set()
+    for other_fact in all_facts:
+        if other_fact.id == fact.id:
+            continue
+        value = other_fact.get_fact_data().get(quiz_field)
+        if is_image_value(value) and value != correct_answer:
+            distractors.add(value)
+
+    return len(distractors) >= 3
+
+
+def _choose_field_pair(fact, all_facts, last_question_key=None):
+    """
+    Pick a context/quiz field pair, avoiding a repeat of the last question.
+
+    Also avoids image answers that would need text placeholders to fill the
+    option grid. On the final attempt either constraint is dropped rather than
+    failing to produce a question.
+
+    Args:
+        fact: Fact object to quiz
+        all_facts: List of all Fact objects in the domain
+        last_question_key: Optional last question key to avoid duplicating
+
+    Returns:
+        tuple: (context_field, quiz_field)
+    """
+    max_retries = 10
+
+    for attempt in range(max_retries):
+        candidate_context, candidate_quiz = select_field_pair(fact)
+        candidate_key = f"{fact.id}:{candidate_context}:{candidate_quiz}"
+        is_last_attempt = attempt == max_retries - 1
+
+        if is_last_attempt:
+            return candidate_context, candidate_quiz
+        if candidate_key == last_question_key:
+            continue
+        if not has_enough_image_distractors(fact, candidate_quiz, all_facts):
+            continue
+
+        return candidate_context, candidate_quiz
 
 
 def prepare_quiz_question(domain_id, question_count, user_id, last_question_key=None):
@@ -402,6 +488,7 @@ def prepare_quiz_question(domain_id, question_count, user_id, last_question_key=
             - fact_id: ID of the quizzed fact
             - context_field: Field used as context
             - quiz_field: Field being quizzed
+            - context_image: Context field's image value, or None
         Returns None if no facts available
     """
     # Select fact
@@ -416,18 +503,7 @@ def prepare_quiz_question(domain_id, question_count, user_id, last_question_key=
     domain = Domain.query.get(domain_id)
 
     # Try to select field pair different from last question
-    max_retries = 10
-    context_field = None
-    quiz_field = None
-
-    for attempt in range(max_retries):
-        candidate_context, candidate_quiz = select_field_pair(fact)
-        candidate_key = f"{fact.id}:{candidate_context}:{candidate_quiz}"
-
-        if candidate_key != last_question_key or attempt == max_retries - 1:
-            context_field = candidate_context
-            quiz_field = candidate_quiz
-            break
+    context_field, quiz_field = _choose_field_pair(fact, all_facts, last_question_key)
 
     # Generate question
     question_data = generate_question(
@@ -489,6 +565,7 @@ def prepare_quiz_question_for_fact(fact, domain_id, last_question_key=None):
             - fact_id: ID of the fact
             - context_field: Field used as context
             - quiz_field: Field being quizzed
+            - context_image: Context field's image value, or None
         Returns None if fact is invalid
     """
     if not fact:
@@ -501,18 +578,7 @@ def prepare_quiz_question_for_fact(fact, domain_id, last_question_key=None):
     domain = Domain.query.get(domain_id)
 
     # Try to select field pair different from last question
-    max_retries = 10
-    context_field = None
-    quiz_field = None
-
-    for attempt in range(max_retries):
-        candidate_context, candidate_quiz = select_field_pair(fact)
-        candidate_key = f"{fact.id}:{candidate_context}:{candidate_quiz}"
-
-        if candidate_key != last_question_key or attempt == max_retries - 1:
-            context_field = candidate_context
-            quiz_field = candidate_quiz
-            break
+    context_field, quiz_field = _choose_field_pair(fact, all_facts, last_question_key)
 
     # Generate question
     question_data = generate_question(

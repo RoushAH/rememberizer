@@ -4,6 +4,11 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import current_user, login_required
 from models import db, User, Domain
 from services.user_service import create_user
+from services.image_service import (
+    discard_uploaded_images,
+    resolve_image_references,
+    save_uploaded_images,
+)
 import json
 import csv
 import io
@@ -156,6 +161,7 @@ def create_domain():
             return redirect(url_for("teacher.create_domain_form"))
 
         # Parse CSV
+        uploaded_images = {}
         try:
             csv_content = file.read().decode("utf-8")
             csv_reader = csv.DictReader(io.StringIO(csv_content))
@@ -165,6 +171,10 @@ def create_domain():
 
             # Read all facts
             facts_data = [row for row in csv_reader]
+
+            # Swap "img:erato.png" cells for the stored upload path
+            uploaded_images = save_uploaded_images(request.files.getlist("image_files"))
+            facts_data = resolve_image_references(facts_data, uploaded_images)
 
             # Create domain
             from services.domain_service import create_custom_domain
@@ -185,9 +195,11 @@ def create_domain():
             return redirect(url_for("teacher.domains"))
 
         except ValueError as e:
+            discard_uploaded_images(uploaded_images.values())
             flash(f"Validation error: {str(e)}", "error")
             return redirect(url_for("teacher.create_domain_form"))
         except Exception as e:
+            discard_uploaded_images(uploaded_images.values())
             flash(f"Error processing CSV: {str(e)}", "error")
             return redirect(url_for("teacher.create_domain_form"))
 
@@ -221,8 +233,13 @@ def create_domain():
                 return redirect(url_for("teacher.create_domain_form"))
 
         # Create domain and facts
+        uploaded_images = {}
         try:
             from services.domain_service import create_custom_domain
+
+            # Swap "img:erato.png" values for the stored upload path
+            uploaded_images = save_uploaded_images(request.files.getlist("image_files"))
+            facts_data = resolve_image_references(facts_data, uploaded_images)
 
             domain = create_custom_domain(
                 name=domain_name,
@@ -236,6 +253,7 @@ def create_domain():
             return redirect(url_for("teacher.domains"))
 
         except ValueError as e:
+            discard_uploaded_images(uploaded_images.values())
             flash(f"Validation error: {str(e)}", "error")
             return redirect(url_for("teacher.create_domain_form"))
 
@@ -534,10 +552,12 @@ def groups():
     group_data = []
     for group in all_groups:
         students = get_students_in_group(group.id)
-        group_data.append({
-            "group": group,
-            "student_count": len(students),
-        })
+        group_data.append(
+            {
+                "group": group,
+                "student_count": len(students),
+            }
+        )
 
     return render_template("teacher/groups.html", group_data=group_data)
 
@@ -839,7 +859,9 @@ def download_sample_csv():
     return Response(
         csv_content,
         mimetype="text/csv",
-        headers={"Content-Disposition": "attachment;filename=student_import_template.csv"},
+        headers={
+            "Content-Disposition": "attachment;filename=student_import_template.csv"
+        },
     )
 
 
@@ -870,11 +892,13 @@ def templates():
     template_data = []
     for template in all_templates:
         domains = get_template_domains(template.id)
-        template_data.append({
-            "template": template,
-            "domains": domains,
-            "domain_count": len(domains),
-        })
+        template_data.append(
+            {
+                "template": template,
+                "domains": domains,
+                "domain_count": len(domains),
+            }
+        )
 
     return render_template("teacher/templates.html", template_data=template_data)
 

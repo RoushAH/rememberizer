@@ -5,17 +5,18 @@ from app import app, db
 from models import User, Organization
 from services.user_service import create_user
 
+
 def create_default_admin():
     """Create a default admin user."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("CREATING DEFAULT ADMIN ACCOUNT")
-    print("="*60)
+    print("=" * 60)
 
     with app.app_context():
         # Check if admin already exists
         existing_admin = User.query.filter_by(role="admin").first()
         if existing_admin:
-            print(f"\nAdmin account already exists:")
+            print("\nAdmin account already exists:")
             print(f"  Email: {existing_admin.email}")
             print(f"  Name: {existing_admin.get_full_name()}")
             print("\nIf you forgot your password, you can reset it by:")
@@ -38,19 +39,19 @@ def create_default_admin():
                 role="admin",
                 first_name="Admin",
                 last_name="User",
-                organization_id=org.id
+                organization_id=org.id,
             )
             db.session.commit()
 
-            print("\n" + "="*60)
+            print("\n" + "=" * 60)
             print("SUCCESS! Default admin account created.")
-            print("="*60)
-            print(f"\nEmail:    admin@admin.admin")
-            print(f"Password: adminpass123")
+            print("=" * 60)
+            print("\nEmail:    admin@admin.admin")
+            print("Password: adminpass123")
             print(f"Name:     {admin.get_full_name()}")
             print(f"Role:     {admin.role}")
-            print(f"\n*** IMPORTANT: Change this password after first login! ***")
-            print(f"\nYou can now log in at: http://127.0.0.1:5000/login")
+            print("\n*** IMPORTANT: Change this password after first login! ***")
+            print("\nYou can now log in at: http://127.0.0.1:5000/login")
             print()
 
             return True
@@ -58,6 +59,7 @@ def create_default_admin():
         except ValueError as e:
             print(f"\nError: {e}")
             return False
+
 
 if __name__ == "__main__":
     success = create_default_admin()
