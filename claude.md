@@ -237,6 +237,84 @@ rememberizer/
 
 ---
 
+## 2026-09-23: Photo Roster Import
+
+### Overview
+Teachers can now build a whole photo domain from the two files a school MIS already
+exports: a roster CSV and a gallery of photos. Create Domain gains a third tab,
+**[PHOTO ROSTER]**, alongside form entry and CSV upload.
+
+### The Convention
+The CSV's **first column is the photo's filename without its extension** - which is how
+MIS exports already work (`10482` in the CSV, `10482.jpg` in the gallery):
+
+```
+ManagementSystemID,Surname,Forename,YearGroup,TutorGroup
+10482,Wright,Alex,Year 9,9B
+```
+
+becomes
+
+```python
+{"photo": "img:uploads/a3f9c1e8.jpeg", "surname": "Wright", "forename": "Alex",
+ "year_group": "Year 9", "tutor_group": "9B"}
+```
+
+The key column is **replaced**, not kept: "What is the management system id of this
+student?" is not a question worth asking, and the photo sitting first makes it the
+domain's identifying field, which is what gives "What is the surname of this student?"
+instead of an attempt to interpolate an image into a sentence. See ARCHITECTURE.md
+decision 10.
+
+Nothing new reaches the database: the import produces ordinary facts carrying ordinary
+`img:` values, so quizzing, grading and rendering were already done by the fact-images
+work above.
+
+### Changes Made
+
+**1. New service: `services/photo_roster_service.py`** (476 lines)
+- `normalise_field_name` - `YearGroup` -> `year_group`, so the quiz says "year group"
+- `photo_key` - basename minus extension, lowercased; matches `photos/10482.JPG` to `10482`
+- `collect_photo_files` - index a folder-picker submission, ignoring non-images and
+  dot-files (a folder picker sends *everything* in the folder)
+- `collect_zip_photos` - same index from a zip, so the MIS bundle needs no unzipping.
+  Entry size is checked from the zip header *before* reading, plus caps on entry count
+  and expanded total
+- `decode_csv` - UTF-8 (BOM tolerated) falling back to cp1252, because exports go
+  through Excel
+- `parse_roster_csv` / `resolve_included_headers` - headers and optional column picker
+- `build_photo_facts` - assembles facts, stores only matched photos, rolls back every
+  stored photo if anything later fails
+- `format_import_report` - what was skipped and why, truncated after 10 names
+
+**2. `blueprints/teacher.py`**
+- `POST /teacher/domains/import-photos`, discarding stored photos on every error path
+- `create_domain_form` now takes `?tab=` so a failed import reopens its own tab
+
+**3. `templates/teacher/create_domain.html`**
+- Third tab; `showTab()` generalised over a list of tab names
+- Folder picker (`webkitdirectory`) *or* zip upload, photo field name, columns to quiz
+- JS previews the match count and **filters the folder selection before upload**, so a
+  form-room gallery does not push a 25MB request. The server re-checks everything; the
+  JS is bandwidth and reassurance only, and falls back to sending the lot
+
+### Decisions Worth Remembering
+- **Skipping beats rejecting**: a row with no photo is dropped and reported. An export
+  routinely covers students without a photo and the teacher cannot fix that from here
+- **Unmatched photos are never stored**: the gallery is usually wider than the roster
+- **Collisions are errors**: two headers that tidy to one field name, a header that
+  cannot be named, or a column clashing with the photo field all fail loudly rather
+  than silently losing a column
+- **Privacy**: created unpublished like any custom domain, and the docs on the tab say
+  to keep a domain of student photos that way
+
+### Testing
+- 57 new tests in `tests/test_photo_roster_import.py` (`photo_roster_service` at 99%)
+- 326 tests passing overall, coverage 71% -> 73%, `blueprints/teacher.py` 40% -> 44%
+- `black --check .` and `flake8 .` clean
+
+---
+
 ## 2026-09-01: Fact Images
 
 ### Overview
@@ -370,7 +448,7 @@ README now states the real number and names the gaps instead of hiding them.
 - Session management with Flask-Login
 
 ### Test Coverage
-- 269 tests, 71% overall coverage (as of 2026-09-01)
+- 326 tests, 73% overall coverage (as of 2026-09-23)
 - Tests organized by feature area
 - Fixtures for authenticated users and test data
 - Untested: analytics_service, group_service, template_service,
@@ -404,7 +482,8 @@ rememberizer/
 │   ├── group_service.py
 │   ├── streak_service.py
 │   ├── template_service.py
-│   └── image_service.py   # Fact images (NEW!)
+│   ├── image_service.py   # Fact images
+│   └── photo_roster_service.py  # Domain from roster CSV + photos (NEW!)
 ├── blueprints/            # Route handlers
 │   ├── admin.py
 │   ├── auth_routes.py
@@ -440,4 +519,4 @@ rememberizer/
 
 ---
 
-*Last updated: 2026-09-01*
+*Last updated: 2026-09-23*

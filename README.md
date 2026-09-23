@@ -29,7 +29,7 @@ The app now features a complete multi-user authentication and authorization syst
 - ✅ **Teacher dashboard**: View all students with progress summaries and detailed metrics
 - ✅ **Student dashboard**: See only assigned domains with personal progress
 - ✅ **70+ new tests** covering authentication, authorization, and multi-user functionality
-- ✅ **Test coverage**: 269 tests, 71% overall (see Testing for where the gaps are)
+- ✅ **Test coverage**: 326 tests, 73% overall (see Testing for where the gaps are)
 
 ### User Roles
 
@@ -142,6 +142,16 @@ The application will then start normally at `http://localhost:5000`.
 - **Both authoring paths**: Works with form entry and CSV upload
 - **Validated uploads**: Format checked by file signature (not extension), 5MB per image, 25MB per request
 - **No answer leaks**: Stored under random filenames so the page source never names the answer
+
+### Photo Roster Import
+
+- **Two pickers, one domain**: Point at a roster CSV and the folder (or zip) of photos
+- **Matched by filename**: The CSV's first column is the photo's filename without its extension, which is how MIS exports already work (`10482` in the CSV, `10482.jpg` in the gallery)
+- **The ID becomes the picture**: The key column is replaced by an image field, so the opaque ID is never quizzed
+- **Headers become readable fields**: `YearGroup` is asked about as "year group"
+- **Choose what to quiz**: Leave columns like `DateOfBirth` out of the domain
+- **Partial rosters are fine**: Rows with no photo are skipped and reported, not rejected
+- **Only what is needed is stored**: Photos no row names are never saved to disk
 
 ### User Interface
 
@@ -274,6 +284,7 @@ rememberizer/
 │   ├── domain_service.py        # Domain assignment & visibility
 │   ├── progress_service.py      # Progress tracking & statistics
 │   ├── image_service.py         # Fact images (markers, uploads, validation)
+│   ├── photo_roster_service.py  # Domain from a roster CSV + folder/zip of photos
 │   ├── analytics_service.py     # Data aggregation & insights
 │   ├── group_service.py         # Student groups & bulk assignment
 │   ├── template_service.py      # Assignment templates
@@ -294,7 +305,7 @@ rememberizer/
 ├── facts/                       # JSON fact files directory
 │   ├── greek_muses.json         # Example: 9 Greek muses
 │   └── chinese_dynasties.json   # Example: 14 Chinese dynasties
-├── tests/                       # Test suite (269 tests)
+├── tests/                       # Test suite (326 tests)
 │   ├── README.md                # Testing documentation
 │   ├── conftest.py              # Shared test fixtures (app, users, domains)
 │   ├── test_auth.py             # Authentication
@@ -303,6 +314,7 @@ rememberizer/
 │   ├── test_models.py           # Database models & learning states
 │   ├── test_quiz_logic.py       # Quiz generation & fact selection
 │   ├── test_image_fields.py     # Fact images (markers, uploads, rendering)
+│   ├── test_photo_roster_import.py # Photo roster import (CSV + photos)
 │   ├── test_domain_creation.py  # Teacher domain creation
 │   ├── test_duplicate_symbols.py# Duplicate field values in options
 │   ├── test_fact_service.py     # Fact learning state transitions
@@ -705,6 +717,60 @@ four options render as images. A field is only quizzed as an image answer if the
 has at least 3 other distinct images in that field, so the option grid does not end up
 mixing images with text placeholders.
 
+## Importing a Photo Roster
+
+A whole photo domain can be built from two things a school MIS already produces: a
+roster CSV and a gallery of photos named after an ID. Teacher → Domains → Create
+Domain → **[PHOTO ROSTER]**.
+
+**The CSV** — the first column is the photo's filename without its extension. Every
+other column becomes something to quiz:
+
+```csv
+ManagementSystemID,Surname,Forename,YearGroup,TutorGroup
+10482,Wright,Alex,Year 9,9B
+10483,Okafor,Chidi,Year 9,9B
+```
+
+**The photos** — either pick the folder, or upload the zip the export came in:
+
+```
+photos/10482.jpg
+photos/10483.jpg
+```
+
+**What you get** — one fact per matched row. The ID column is *replaced* by the photo,
+because an opaque ID is not worth quizzing, and headers are tidied into field names so
+questions read properly:
+
+```json
+{"photo": "img:uploads/a3f9c1e8.jpeg", "surname": "Wright", "forename": "Alex",
+ "year_group": "Year 9", "tutor_group": "9B"}
+```
+
+That domain quizzes both ways round: "What is the surname of this 9b face?" with the
+photo shown, and "Which 9b face has Wright as their surname?" with four photos as the
+options.
+
+**Options on the form:**
+- **Photo Field Name** — what questions call the picture (default `photo`)
+- **Columns to Quiz** — comma-separated; blank means every column. Use it to keep
+  columns like `DateOfBirth` out of the domain entirely
+
+**Behaviour worth knowing:**
+- Matching ignores case and extension: `10482` matches `10482.JPG`
+- Rows with no matching photo are **skipped and reported**, not rejected — an export
+  routinely covers students whose photo is missing
+- Photos that no row names are never uploaded or stored; when you pick a folder the
+  browser filters the selection before it is sent
+- At least 4 rows must match a photo (multiple choice needs four options)
+- A blank first column, a column that cannot be named, or two columns that tidy down
+  to the same field name are all reported rather than silently dropped
+- CSVs are read as UTF-8 (BOM tolerated) and fall back to Windows-1252
+- Zips are capped at 2,000 entries and 50MB expanded, per-photo limits still apply
+- The domain is private to your organization until you publish it — **leave a domain
+  of student photos unpublished**
+
 ## Testing
 
 ### Running Tests
@@ -742,33 +808,35 @@ pytest -m models            # Model tests
 
 ### Test Suite Overview
 
-**269 tests** across 14 test files:
+**326 tests** across 15 test files:
 
-1. **test_routes.py** (43 tests): Flask routes and quiz flows
-2. **test_image_fields.py** (42 tests): Image markers, uploads, resolution, rendering
-3. **test_models.py** (33 tests): Database models, learning states, fact state transitions
-4. **test_quiz_logic.py** (23 tests): Quiz generation, fact selection, spaced repetition
-5. **test_auth.py** (18 tests): User creation, authentication, login/logout, password setup
-6. **test_streak_service.py** (17 tests): Practice streaks and daily goals
-7. **test_multi_user.py** (17 tests): Progress isolation, domain assignment, engagement metrics
-8. **test_authorization.py** (16 tests): Role-based access control, organization isolation
-9. **test_domain_creation.py** (16 tests): Teacher domain creation via form and CSV
-10. **test_facts_loader.py** (16 tests): JSON loading and validation
-11. **test_doom_loop.py** (11 tests): Recovery mode logic
-12. **test_duplicate_symbols.py** (8 tests): Duplicate field values in answer options
-13. **test_template_filters.py** (5 tests): Jinja2 filter tests
-14. **test_fact_service.py** (4 tests): Fact learning state transitions
+1. **test_photo_roster_import.py** (57 tests): Photo roster import (CSV + photo folder/zip)
+2. **test_routes.py** (43 tests): Flask routes and quiz flows
+3. **test_image_fields.py** (42 tests): Image markers, uploads, resolution, rendering
+4. **test_models.py** (33 tests): Database models, learning states, fact state transitions
+5. **test_quiz_logic.py** (23 tests): Quiz generation, fact selection, spaced repetition
+6. **test_auth.py** (18 tests): User creation, authentication, login/logout, password setup
+7. **test_streak_service.py** (17 tests): Practice streaks and daily goals
+8. **test_multi_user.py** (17 tests): Progress isolation, domain assignment, engagement metrics
+9. **test_authorization.py** (16 tests): Role-based access control, organization isolation
+10. **test_domain_creation.py** (16 tests): Teacher domain creation via form and CSV
+11. **test_facts_loader.py** (16 tests): JSON loading and validation
+12. **test_doom_loop.py** (11 tests): Recovery mode logic
+13. **test_duplicate_symbols.py** (8 tests): Duplicate field values in answer options
+14. **test_template_filters.py** (5 tests): Jinja2 filter tests
+15. **test_fact_service.py** (4 tests): Fact learning state transitions
 
-**Code Coverage:** 71% overall
+**Code Coverage:** 73% overall
 
 Well covered:
-- models.py: 99% · fact_service: 99% · progress_service: 97% · image_service: 97%
-- facts_loader: 94% · domain_service: 93% · user_service: 92% · quiz_logic: 89%
+- models.py: 99% · fact_service: 99% · photo_roster_service: 99% · progress_service: 97%
+- image_service: 97% · facts_loader: 94% · domain_service: 93% · user_service: 92% ·
+  quiz_logic: 89%
 
 Gaps worth knowing about — these ship without tests:
 - `services/analytics_service.py`, `services/group_service.py`,
   `services/template_service.py`, `services/bulk_import_service.py`: **0%**
-- `blueprints/analytics.py`: 27% · `blueprints/teacher.py`: 40% ·
+- `blueprints/analytics.py`: 27% · `blueprints/teacher.py`: 44% ·
   `blueprints/admin.py`: 48%
 
 The root utility scripts (`rebuild_db.py`, `verify_database.py`, etc.) are not
@@ -978,6 +1046,15 @@ Contributions welcome! Please ensure:
 For issues, questions, or feature requests, please file an issue on GitHub.
 
 ## Changelog
+
+### Unreleased - Photo Roster Import
+- Teachers build a domain from a roster CSV plus a folder or zip of photos
+  (Teacher → Domains → Create Domain → PHOTO ROSTER)
+- The CSV's first column names the photo file; that column becomes the image field
+- Optional column picker keeps data like `DateOfBirth` out of the domain
+- Rows without a photo are skipped and reported; unmatched photos are never stored
+- Added `services/photo_roster_service.py` and 57 tests in
+  `tests/test_photo_roster_import.py`
 
 ### Unreleased - Fact Images
 - Fact fields can hold images via an inline `img:` marker (no schema change)

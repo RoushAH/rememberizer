@@ -9,8 +9,9 @@
     <h2>&gt; DOMAIN CREATION</h2>
 
     <div class="tabs" style="margin-bottom: 20px;">
-        <button class="tab-btn active" onclick="showTab('form')" id="form-tab-btn">[FORM ENTRY]</button>
+        <button class="tab-btn" onclick="showTab('form')" id="form-tab-btn">[FORM ENTRY]</button>
         <button class="tab-btn" onclick="showTab('csv')" id="csv-tab-btn">[CSV UPLOAD]</button>
+        <button class="tab-btn" onclick="showTab('photos')" id="photos-tab-btn">[PHOTO ROSTER]</button>
     </div>
 
     <!-- Form Entry Tab -->
@@ -156,22 +157,259 @@ Clio,Scroll,img:https://example.org/clio.png</pre>
             </div>
         </form>
     </div>
+
+    <!-- Photo Roster Tab -->
+    <div id="photos-tab" class="tab-content" style="display:none;">
+        <form method="POST" action="{{ url_for('teacher.import_photo_roster') }}" enctype="multipart/form-data" class="create-form" id="roster-form">
+
+            <div class="form-group">
+                <label for="roster_domain_name">Domain Name:</label>
+                <input type="text" id="roster_domain_name" name="domain_name" required
+                       placeholder="9B Faces" class="form-input">
+            </div>
+
+            <div class="form-group">
+                <label for="roster_csv">Roster CSV:</label>
+                <input type="file" id="roster_csv" name="csv_file" accept=".csv" required
+                       class="form-input" style="padding: 10px;">
+                <div style="margin-top: 5px; font-size: 0.9em; color: #00aa00;">
+                    First column must be the photo filename without its extension
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="photo_files">Photo Folder:</label>
+                <input type="file" id="photo_files" name="photo_files" multiple webkitdirectory
+                       class="form-input" style="padding: 10px;">
+                <div style="margin-top: 5px; font-size: 0.9em; color: #00aa00;">
+                    Choose the folder of photos. Only the ones your CSV names are uploaded
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="photo_zip">&hellip; or Photo Zip:</label>
+                <input type="file" id="photo_zip" name="photo_zip" accept=".zip"
+                       class="form-input" style="padding: 10px;">
+                <div style="margin-top: 5px; font-size: 0.9em; color: #00aa00;">
+                    Upload the zip your MIS produced, no unzipping needed (max 25MB)
+                </div>
+            </div>
+
+            <div id="roster-summary" class="info-box" style="display:none;"></div>
+
+            <div class="form-group">
+                <label for="photo_field">Photo Field Name:</label>
+                <input type="text" id="photo_field" name="photo_field"
+                       placeholder="photo" class="form-input">
+                <div style="margin-top: 5px; font-size: 0.9em; color: #00aa00;">
+                    Optional. What the questions call the picture &mdash; defaults to
+                    <code>photo</code>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="include_columns">Columns to Quiz (comma-separated):</label>
+                <input type="text" id="include_columns" name="include_columns"
+                       placeholder="Surname, Forename, TutorGroup" class="form-input">
+                <div style="margin-top: 5px; font-size: 0.9em; color: #00aa00;">
+                    Optional. Leave blank to quiz every column. Use this to leave out
+                    columns like DateOfBirth
+                </div>
+            </div>
+
+            <div class="info-box">
+                <p><strong>How it works:</strong></p>
+                <p style="margin-top: 5px;">Point at a roster export and its photo gallery.
+                   Each row becomes one fact: the first column is matched to a photo file and
+                   <em>replaced</em> by it, and every other column becomes something to quiz.</p>
+
+                <p style="margin-top: 15px;"><strong>Roster CSV:</strong></p>
+                <pre style="background-color: #1a1a1a; padding: 10px; margin-top: 5px; border: 1px solid #00ff00; font-size: 0.85em;">ManagementSystemID,Surname,Forename,YearGroup,TutorGroup
+10482,Wright,Alex,Year 9,9B
+10483,Okafor,Chidi,Year 9,9B</pre>
+
+                <p style="margin-top: 15px;"><strong>Photo folder:</strong></p>
+                <pre style="background-color: #1a1a1a; padding: 10px; margin-top: 5px; border: 1px solid #00ff00; font-size: 0.85em;">photos/10482.jpg
+photos/10483.jpg</pre>
+
+                <p style="margin-top: 15px;"><strong>Gives you facts like:</strong></p>
+                <pre style="background-color: #1a1a1a; padding: 10px; margin-top: 5px; border: 1px solid #00ff00; font-size: 0.85em;">{"photo": "&lt;10482.jpg&gt;", "surname": "Wright", "forename": "Alex",
+ "year_group": "Year 9", "tutor_group": "9B"}</pre>
+
+                <p style="margin-top: 15px;"><strong>Notes:</strong></p>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li>Matching ignores case and the file extension: <code>10482</code>
+                        matches <code>10482.JPG</code></li>
+                    <li>Rows with no matching photo are skipped and reported, not rejected</li>
+                    <li>Photos no row names are never uploaded or stored</li>
+                    <li>At least 4 rows must match a photo, for multiple-choice questions</li>
+                    <li>Headers are tidied into field names: <code>YearGroup</code> is asked
+                        about as &ldquo;year group&rdquo;</li>
+                    <li>Allowed image types: PNG, JPG, GIF, WebP. Max 5MB per photo,
+                        25MB per upload</li>
+                    <li>The domain is private to your organization until you publish it
+                        &mdash; keep photo domains unpublished</li>
+                </ul>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="submit-button">[BUILD DOMAIN FROM ROSTER]</button>
+                <a href="{{ url_for('teacher.domains') }}" class="home-button" style="margin-left: 15px;">[CANCEL]</a>
+            </div>
+        </form>
+    </div>
 </div>
 
 <script>
+const TAB_NAMES = ['form', 'csv', 'photos'];
+
 function showTab(tabName) {
-    // Hide all tabs
-    document.getElementById('form-tab').style.display = 'none';
-    document.getElementById('csv-tab').style.display = 'none';
+    TAB_NAMES.forEach(function (name) {
+        document.getElementById(name + '-tab').style.display = 'none';
+        document.getElementById(name + '-tab-btn').classList.remove('active');
+    });
 
-    // Remove active class from all buttons
-    document.getElementById('form-tab-btn').classList.remove('active');
-    document.getElementById('csv-tab-btn').classList.remove('active');
-
-    // Show selected tab
     document.getElementById(tabName + '-tab').style.display = 'block';
     document.getElementById(tabName + '-tab-btn').classList.add('active');
 }
+
+const INITIAL_TAB = '{{ active_tab|default("form") }}';
+showTab(TAB_NAMES.indexOf(INITIAL_TAB) >= 0 ? INITIAL_TAB : 'form');
+
+// ---------------------------------------------------------------------------
+// Photo roster: preview what the CSV and the chosen photos have in common, and
+// upload only the photos the CSV actually names. The server re-checks all of
+// this; the preview is a courtesy and the filtering saves bandwidth.
+// ---------------------------------------------------------------------------
+(function () {
+    const form = document.getElementById('roster-form');
+    const csvInput = document.getElementById('roster_csv');
+    const folderInput = document.getElementById('photo_files');
+    const summary = document.getElementById('roster-summary');
+    const PHOTO_PATTERN = /\.(png|jpe?g|gif|webp)$/i;
+    let submitting = false;
+
+    function photoKey(filename) {
+        const base = filename.split(/[\\/]/).pop();
+        return base.replace(/\.[^.]*$/, '').trim().toLowerCase();
+    }
+
+    // Header text comes out of the teacher's own file, but it still goes into
+    // the page as markup, so escape it.
+    function escapeHtml(text) {
+        const holder = document.createElement('span');
+        holder.textContent = text;
+        return holder.innerHTML;
+    }
+
+    function readCsv(file) {
+        return new Promise(function (resolve, reject) {
+            const reader = new FileReader();
+            reader.onload = function () { resolve(String(reader.result)); };
+            reader.onerror = function () { reject(reader.error); };
+            reader.readAsText(file);
+        });
+    }
+
+    function firstCell(line) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('"')) {
+            const closing = trimmed.indexOf('"', 1);
+            return closing === -1 ? trimmed.slice(1) : trimmed.slice(1, closing);
+        }
+        return trimmed.split(',')[0];
+    }
+
+    function parseRoster(text) {
+        const lines = text.split(/\r?\n/).filter(function (line) { return line.trim() !== ''; });
+        const headers = lines.length ? lines[0].split(',').map(function (h) { return h.trim(); }) : [];
+        const keys = lines.slice(1).map(function (line) { return firstCell(line).trim().toLowerCase(); });
+        return { headers: headers, keys: keys.filter(Boolean) };
+    }
+
+    function photoKeysIn(files) {
+        const keys = new Set();
+        for (let i = 0; i < files.length; i++) {
+            const name = files[i].name;
+            if (PHOTO_PATTERN.test(name) && !name.startsWith('.')) {
+                keys.add(photoKey(name));
+            }
+        }
+        return keys;
+    }
+
+    function updateSummary() {
+        if (!csvInput.files.length) {
+            summary.style.display = 'none';
+            return;
+        }
+
+        readCsv(csvInput.files[0]).then(function (text) {
+            const roster = parseRoster(text);
+            const available = photoKeysIn(folderInput.files);
+            const matched = roster.keys.filter(function (key) { return available.has(key); });
+
+            let html = '<p><strong>' + roster.keys.length + ' rows</strong> in the CSV.</p>';
+            html += '<p style="margin-top: 5px;">Photo filename column: <code>' +
+                    escapeHtml(roster.headers[0] || '?') + '</code></p>';
+            html += '<p style="margin-top: 5px;">Columns to quiz: <code>' +
+                    escapeHtml(roster.headers.slice(1).join(', ') || 'none') +
+                    '</code></p>';
+
+            if (folderInput.files.length) {
+                html += '<p style="margin-top: 5px;"><strong>' + matched.length +
+                        '</strong> rows matched a photo, <strong>' +
+                        (roster.keys.length - matched.length) +
+                        '</strong> will be skipped.</p>';
+            } else {
+                html += '<p style="margin-top: 5px;">Choose a photo folder above to check ' +
+                        'the matches before uploading (a zip is checked on the server).</p>';
+            }
+
+            summary.innerHTML = html;
+            summary.style.display = 'block';
+        }).catch(function () {
+            summary.style.display = 'none';
+        });
+    }
+
+    csvInput.addEventListener('change', updateSummary);
+    folderInput.addEventListener('change', updateSummary);
+
+    form.addEventListener('submit', function (event) {
+        if (submitting || !folderInput.files.length || !csvInput.files.length) {
+            return;
+        }
+        if (typeof DataTransfer === 'undefined') {
+            return;
+        }
+
+        event.preventDefault();
+
+        readCsv(csvInput.files[0]).then(function (text) {
+            const wanted = new Set(parseRoster(text).keys);
+            const keep = new DataTransfer();
+
+            for (let i = 0; i < folderInput.files.length; i++) {
+                const file = folderInput.files[i];
+                if (PHOTO_PATTERN.test(file.name) && wanted.has(photoKey(file.name))) {
+                    keep.items.add(file);
+                }
+            }
+
+            // With nothing matching, send the selection as-is so the server can
+            // explain why rather than reporting "no photos found".
+            if (keep.files.length) {
+                folderInput.files = keep.files;
+            }
+        }).catch(function () {
+            // Fall through: send everything and let the server sort it out.
+        }).then(function () {
+            submitting = true;
+            form.submit();
+        });
+    });
+})();
 </script>
 
 <style>

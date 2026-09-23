@@ -937,6 +937,7 @@ rememberizer/
 │   ├── domain_service.py
 │   ├── progress_service.py
 │   ├── image_service.py    # Fact images (markers, uploads, validation)
+│   ├── photo_roster_service.py  # Domain from roster CSV + photo folder/zip
 │   ├── analytics_service.py
 │   ├── group_service.py
 │   ├── template_service.py
@@ -1007,7 +1008,7 @@ rememberizer/
 - Progress tracking and engagement metrics
 - Fact image handling (`image_service.py` is the one exception to the
   no-Flask rule: it needs `current_app` for the upload path and `url_for`
-  to build image URLs)
+  to build image URLs; `photo_roster_service.py` inherits this by calling it)
 - **NO Flask dependencies** elsewhere (pure Python + SQLAlchemy)
 
 **auth.py (Authentication & Authorization):**
@@ -1626,6 +1627,38 @@ this feature needed.
 upload validation and storage, and reference resolution. Templates reach it through
 three Jinja hooks registered in `app.py`: the `image_value` test, the `image_src`
 filter, and the `learn_card_alt` global.
+
+### 10. Photo Rosters Replace the Key Column (vs. Keeping It as a Field)
+
+**Decision**: When a domain is imported from a roster CSV plus a photo gallery, the
+CSV's first column is used to match photos and is then **dropped** as a field, replaced
+by an image field holding the matched photo.
+
+**Why:**
+- **The key is an MIS surrogate**: "What is the management system id of this student?"
+  is a question nobody wants asked. The ID's only job is to join the two exports
+- **The photo is the identity**: as the first field it becomes the domain's identifying
+  field, which is what makes questions read "What is the surname of this student?"
+  rather than trying to interpolate an image into a sentence
+- **No new concepts**: the import produces ordinary facts carrying ordinary `img:`
+  values, so quizzing, grading and rendering were already done (decision 9)
+
+**Trade-offs:**
+- **Re-import is a new domain**: nothing links a fact back to its MIS row, so an updated
+  roster means a fresh domain rather than a sync
+- **Matching is by filename only**: a gallery named some other way has to be renamed
+
+**Rejected alternative**: keeping the ID as a hidden, unquizzable field. That needs a
+per-field flag on the domain — the very schema change decision 9 was written to avoid —
+and the ID has no value once the photo is attached.
+
+**Skipping beats rejecting**: a row whose photo is missing is dropped and reported
+rather than failing the import. An export routinely covers students without a photo,
+and a teacher cannot fix the gallery from inside this app.
+
+**Implementation**: `services/photo_roster_service.py` (CSV parsing, filename matching,
+fact assembly, reporting); `POST /teacher/domains/import-photos` wires it to
+`create_custom_domain()` and cleans up stored photos on every error path.
 
 ---
 

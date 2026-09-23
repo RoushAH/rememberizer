@@ -129,7 +129,10 @@ def create_domain_form():
     """Display domain creation form."""
     require_teacher_or_admin()
 
-    return render_template("teacher/create_domain.html")
+    # ?tab= reopens the tab a failed submission came from
+    return render_template(
+        "teacher/create_domain.html", active_tab=request.args.get("tab", "form")
+    )
 
 
 @teacher_bp.route("/domains/create", methods=["POST"])
@@ -256,6 +259,99 @@ def create_domain():
             discard_uploaded_images(uploaded_images.values())
             flash(f"Validation error: {str(e)}", "error")
             return redirect(url_for("teacher.create_domain_form"))
+
+
+@teacher_bp.route("/domains/import-photos", methods=["POST"])
+@login_required
+def import_photo_roster():
+    """
+    Create a domain from a roster CSV plus a folder or zip of photos.
+
+    The CSV's first column names the photo file (without its extension); every
+    other column becomes a field to quiz. See services/photo_roster_service.py.
+    """
+    from services.domain_service import create_custom_domain
+    from services.photo_roster_service import (
+        build_photo_facts,
+        collect_photo_files,
+        collect_zip_photos,
+        decode_csv,
+        format_import_report,
+    )
+
+    require_teacher_or_admin()
+
+    back = redirect(url_for("teacher.create_domain_form", tab="photos"))
+
+    domain_name = request.form.get("domain_name", "").strip()
+    if not domain_name:
+        flash("Domain name is required", "error")
+        return back
+
+    csv_file = request.files.get("csv_file")
+    if not csv_file or not csv_file.filename:
+        flash("No CSV file selected", "error")
+        return back
+    if not csv_file.filename.lower().endswith(".csv"):
+        flash("File must be a CSV", "error")
+        return back
+
+    zip_file = request.files.get("photo_zip")
+
+    # Blank means "quiz every column", so an untouched box must not look chosen
+    include_columns = [
+        column
+        for column in request.form.get("include_columns", "").split(",")
+        if column.strip()
+    ]
+
+    result = None
+    try:
+        # A zip and a folder are alternatives; the zip wins if both are given.
+        if zip_file and zip_file.filename:
+            photos = collect_zip_photos(zip_file)
+        else:
+            photos = collect_photo_files(request.files.getlist("photo_files"))
+
+        if not photos:
+            raise ValueError(
+                "No photos found - choose the folder or zip that holds them "
+                "(PNG, JPG, GIF or WebP)"
+            )
+
+        result = build_photo_facts(
+            decode_csv(csv_file.read()),
+            photos,
+            photo_field=request.form.get("photo_field", "").strip(),
+            include_columns=include_columns,
+        )
+
+        domain = create_custom_domain(
+            name=domain_name,
+            field_names=result["field_names"],
+            facts_data=result["facts_data"],
+            created_by=current_user.id,
+            organization_id=current_user.organization_id,
+        )
+
+    except ValueError as e:
+        if result:
+            discard_uploaded_images(result["image_values"])
+        flash(f"Import failed: {str(e)}", "error")
+        return back
+    except Exception as e:
+        if result:
+            discard_uploaded_images(result["image_values"])
+        flash(f"Error processing the roster: {str(e)}", "error")
+        return back
+
+    report = format_import_report(result)
+    flash(
+        f"Domain '{domain.name}' created with {len(result['facts_data'])} "
+        f"photo facts. {report}".strip(),
+        "success",
+    )
+    return redirect(url_for("teacher.domains"))
 
 
 @teacher_bp.route("/domains/<int:domain_id>/publish", methods=["POST"])
